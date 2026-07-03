@@ -1,0 +1,36 @@
+# Render Blueprint — Creed Space MCP server as a public Streamable HTTP endpoint.
+#
+# One-click deploy: Render Dashboard -> New -> Blueprint -> pick
+# Creed-Space/creedspace-mcp-server -> Apply. Review the plan/region, then create.
+#
+# How it works: the repo's dual-mode Dockerfile serves stdio by default (Docker
+# MCP Catalog) and switches to Streamable HTTP when CREEDSPACE_TRANSPORT=http
+# (set below). Render injects $PORT; the Dockerfile maps it onto --port and binds
+# 0.0.0.0. MCP_ALLOW_INSECURE_HTTP opts out of the server's non-loopback guard —
+# intentional here, this endpoint is meant to be publicly reachable (it serves the
+# public Creed Space API's constitution data; no credentials required).
+#
+# After it deploys, the URL to register on Smithery (smithery.ai/new) is:
+#   https://<service-name>.onrender.com/mcp
+services:
+  - type: web
+    name: creedspace-mcp
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # 'starter' is always-on. The free tier spins down after inactivity, which
+    # makes Smithery's capability scan (and users' first call) fail on a cold
+    # start — not recommended for a public listing.
+    plan: starter
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: CREEDSPACE_TRANSPORT
+        value: http
+      - key: CREEDSPACE_HOST
+        value: "0.0.0.0"
+      - key: MCP_ALLOW_INSECURE_HTTP
+        value: "true"
+      - key: CREEDSPACE_API_URL
+        value: https://api.creed.space
