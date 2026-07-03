@@ -25,11 +25,16 @@ import { startHttpTransport, type HttpTransportConfig } from '../src/transports/
 import type { HttpTransportHandle } from '../src/transports/http';
 import { CreedSpaceMCPServer } from '../src/server';
 
-// Fixed, unlikely-to-collide local port. startHttpTransport resolves its handle
-// with config.port (not the OS-assigned port), so port 0 would not tell us where
-// it bound — a fixed port is required to address it.
-const TEST_PORT = 31199;
-const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
+// Each server instance binds a UNIQUE port. startHttpTransport resolves its
+// handle with config.port (not the OS-assigned port), so port 0 would not tell
+// us where it bound — a fixed, known port is required to address it. But reusing
+// ONE fixed port across the suite is unsafe: the global `fetch` (undici) pools
+// keep-alive sockets by host:port, so a later request can reuse a socket left
+// over from a previously-closed server on that port and fail with
+// `SocketError: other side closed` (older bundled undici does not retry the
+// idempotent GET; newer undici does — a flaky, Node-version-dependent failure).
+// A monotonic counter gives every server its own port, keeping each test hermetic.
+let nextTestPort = 31199;
 
 function makeServer(): Server {
   // A bare MCP Server is enough: the auth/CORS middleware runs before any tool
@@ -44,7 +49,7 @@ async function startTransport(
   overrides: Partial<HttpTransportConfig>
 ): Promise<HttpTransportHandle> {
   const config: HttpTransportConfig = {
-    port: TEST_PORT,
+    port: nextTestPort++,
     host: '127.0.0.1',
     corsEnabled: false,
     stateless: true,
@@ -99,7 +104,7 @@ describe('HTTP Transport Security', () => {
       // A browser cross-origin request carries an Origin header. With CORS off,
       // the server must not reflect/allow the origin, so the browser blocks the
       // cross-origin read.
-      const res = await fetch(`${BASE_URL}/health`, {
+      const res = await fetch(`http://${handle.host}:${handle.port}/health`, {
         headers: { Origin: 'http://evil.example' },
       });
 
@@ -116,7 +121,7 @@ describe('HTTP Transport Security', () => {
         corsOrigins: ['http://localhost:3000'],
       });
 
-      const res = await fetch(`${BASE_URL}/health`, {
+      const res = await fetch(`http://${handle.host}:${handle.port}/health`, {
         headers: { Origin: 'http://localhost:3000' },
       });
 
@@ -179,7 +184,7 @@ describe('HTTP Transport Security', () => {
     it('rejects /mcp POST with no Authorization header (401)', async () => {
       handle = await startTransport({ corsEnabled: false, apiKey });
 
-      const res = await fetch(`${BASE_URL}/mcp`, {
+      const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,7 +201,7 @@ describe('HTTP Transport Security', () => {
     it('rejects /mcp POST with an incorrect Bearer token (403)', async () => {
       handle = await startTransport({ corsEnabled: false, apiKey });
 
-      const res = await fetch(`${BASE_URL}/mcp`, {
+      const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

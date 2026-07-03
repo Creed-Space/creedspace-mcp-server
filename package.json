@@ -20,7 +20,7 @@
     "format:check": "prettier --check src/**/*.ts",
     "validate": "npm run lint && npm run format:check && npm run test",
     "prepublishOnly": "npm run validate && npm run build && test -z \"$(find dist -name '*.map' 2>/dev/null)\"",
-    "postinstall": "node dist/postinstall.js || true",
+    "postinstall": "node -e \"try{const f='./dist/postinstall.js';require('fs').existsSync(f)&&require(f)}catch{}\"",
     "version": "npm run format && git add -A src",
     "postversion": "git push && git push --tags"
   },
@@ -63,7 +63,7 @@
     "typescript": "^5.7.3"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "files": [
     "dist",
