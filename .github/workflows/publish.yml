@@ -54,7 +54,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20.x'
+          # Node 24 ships npm 11.x — OIDC Trusted Publishing needs npm >= 11.5.1.
+          node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
       
       - name: Install dependencies
@@ -75,29 +76,49 @@ jobs:
           fi
           npm version "$INPUT_VERSION" --no-git-tag-version
       
-      - name: Publish to NPM with provenance (Trusted Publishing)
+      # Guarantee npm >= 11.5.1 for OIDC Trusted Publishing regardless of the
+      # runner's bundled npm.
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
+
+      # Auth = tokenless OIDC Trusted Publishing. ONE-TIME npm setup required:
+      #   npmjs.com -> @creedspace/mcp-server -> Settings -> Trusted Publisher ->
+      #   GitHub Actions: org "Creed-Space", repo "creedspace-mcp-server",
+      #   workflow "publish.yml" (leave Environment blank).
+      # id-token: write (set at the top) both authenticates the publish and
+      # signs the provenance attestation — no NPM_TOKEN secret needed.
+      #
+      # Token alternative: instead of the Trusted Publisher config, add a repo
+      # secret NPM_TOKEN (a classic Automation token — bypasses 2FA) and give
+      # this step:  env:\n  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish to npm (provenance via Trusted Publishing)
         run: npm publish --provenance --access public
       
+      # Uses the runner's built-in gh CLI (no third-party action). Idempotent:
+      # edits the release if the tag already has one, else creates it.
       - name: Create GitHub Release
         if: github.event_name == 'push'
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            ## Changes in this release
-            - See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
-            
-            ## Installation
-            ```bash
-            npm install creedspace-mcp-server@latest
-            # or
-            npx creedspace-mcp-server --persona ambassador
-            ```
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## Changes in this release
+          - See [CHANGELOG.md](https://github.com/Creed-Space/creedspace-mcp-server/blob/main/CHANGELOG.md)
+
+          ## Installation
+          ```bash
+          npm install @creedspace/mcp-server@latest
+          # or
+          npx @creedspace/mcp-server --persona ambassador
+          ```
+          EOF
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release edit "$TAG" --repo "$REPO" --title "Release $TAG" --notes-file release-notes.md
+          else
+            gh release create "$TAG" --repo "$REPO" --title "Release $TAG" --notes-file release-notes.md --verify-tag
+          fi
 
   notify:
     needs: publish
