@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `server.json` migrated to the Official MCP Registry `2025-12-11` schema; `repository.url` now points at the public mirror `Creed-Space/creedspace-mcp-server`.
 - Repository URLs updated from `nellwatson/*` to `Creed-Space/creedspace-mcp-server` across README/CHANGELOG/smithery.
+- **Privacy**: usage telemetry is now **opt-in** (`CREEDSPACE_ANALYTICS_OPT_IN=1`); it was previously enabled by default (opt-out). The analytics module is not currently wired into the CLI/server, so no metrics were being sent regardless.
 
 ### Fixed
 - `set_persona` enum accepted `mediator` but rejected `anchor`; corrected to the documented six personas (ambassador, nanny, sentinel, godparent, muse, anchor).

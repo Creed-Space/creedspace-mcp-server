@@ -36,7 +36,7 @@ export class Analytics {
   private errorCount: number = 0;
   private analyticsEndpoint: string;
 
-  constructor(enabled: boolean = true) {
+  constructor(enabled: boolean = false) {
     // Respect DO_NOT_TRACK and CI environments
     this.enabled = enabled && process.env.DO_NOT_TRACK !== '1' && process.env.CI !== 'true';
 
@@ -51,7 +51,7 @@ export class Analytics {
   }
 
   private generateSessionId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   }
 
   private setupExitHandler(): void {
@@ -177,9 +177,12 @@ let analytics: Analytics | null = null;
 
 export function getAnalytics(): Analytics {
   if (!analytics) {
-    // Check user preference
-    const optOut = process.env.CREEDSPACE_ANALYTICS_OPT_OUT === '1';
-    analytics = new Analytics(!optOut);
+    // Opt-IN telemetry: disabled by default. Usage metrics are only sent when
+    // the user explicitly sets CREEDSPACE_ANALYTICS_OPT_IN=1. The legacy
+    // CREEDSPACE_ANALYTICS_OPT_OUT=1 is still honoured as a hard off.
+    const optIn = process.env.CREEDSPACE_ANALYTICS_OPT_IN === '1';
+    const hardOptOut = process.env.CREEDSPACE_ANALYTICS_OPT_OUT === '1';
+    analytics = new Analytics(optIn && !hardOptOut);
   }
   return analytics;
 }
