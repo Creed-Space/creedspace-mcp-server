@@ -32,8 +32,8 @@ npx @creedspace/mcp-server test
 
 Creed Space provides personalized AI safety guardrails through Constitutional AI personas. Each persona enforces specific values and behaviors, ensuring AI assistants operate within defined ethical boundaries.
 
-- 🛡️ **96.4% reduction** in harmful AI outputs
-- 🎯 **100% refusal** on dangerous prompts
+- 🛡️ **Reduces harmful AI outputs** via constitutional evaluation of every response
+- 🎯 **Refuses dangerous prompts** according to the active persona's values
 - 🚀 **10-second setup** with any MCP-compatible AI
 
 ## Available Personas
