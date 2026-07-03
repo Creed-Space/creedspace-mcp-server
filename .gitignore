@@ -1,0 +1,13 @@
+# Dependencies & build artefacts
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+# Local env & OS cruft
+.env
+.env.mcp
+.DS_Store
+logs/
+# MCPB bundle artefacts
+*.mcpb

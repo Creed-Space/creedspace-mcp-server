@@ -1,0 +1,216 @@
+/**
+ * HTTP Transport Security Tests
+ *
+ * Negative tests for the HTTP transport auth + CORS controls (finding #26:
+ * "HTTP MCP transport is unauthenticated with permissive CORS when apiKey is
+ * absent"). These start the real `startHttpTransport` server on a fixed local
+ * port and probe it with `fetch`. Every request here is short-circuited by the
+ * auth/CORS middleware before any MCP tool dispatch, so no live API/DB is
+ * needed.
+ *
+ * Properties under test:
+ *  - CORS defaults to disabled: no `Access-Control-Allow-Origin` is emitted, so
+ *    a browser cross-origin read is blocked (the browser-vector half of #26).
+ *  - When CORS is explicitly enabled, an API key or explicit allowlist is required.
+ *  - When an apiKey is set, `/mcp` requires a valid Bearer token:
+ *      * missing Authorization header -> 401
+ *      * wrong token -> 403
+ */
+
+import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { startHttpTransport, type HttpTransportConfig } from '../src/transports/http';
+import type { HttpTransportHandle } from '../src/transports/http';
+import { CreedSpaceMCPServer } from '../src/server';
+
+// Fixed, unlikely-to-collide local port. startHttpTransport resolves its handle
+// with config.port (not the OS-assigned port), so port 0 would not tell us where
+// it bound — a fixed port is required to address it.
+const TEST_PORT = 31199;
+const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
+
+function makeServer(): Server {
+  // A bare MCP Server is enough: the auth/CORS middleware runs before any tool
+  // dispatch, so handlers are never invoked in these negative tests.
+  return new Server(
+    { name: 'creedspace-test', version: '0.0.0' },
+    { capabilities: { tools: {} } }
+  );
+}
+
+async function startTransport(
+  overrides: Partial<HttpTransportConfig>
+): Promise<HttpTransportHandle> {
+  const config: HttpTransportConfig = {
+    port: TEST_PORT,
+    host: '127.0.0.1',
+    corsEnabled: false,
+    stateless: true,
+    enableJsonResponse: true,
+    ...overrides,
+  };
+  return startHttpTransport(makeServer(), config);
+}
+
+describe('HTTP Transport Security', () => {
+  let handle: HttpTransportHandle | undefined;
+  // Suppress (and later restore) console.error noise without depending on the
+  // `jest` namespace type: the spy is captured locally and restored via a closure.
+  let restoreConsoleError: () => void = () => {};
+
+  beforeEach(() => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    restoreConsoleError = () => spy.mockRestore();
+  });
+
+  afterEach(async () => {
+    if (handle) {
+      await handle.close();
+      handle = undefined;
+    }
+    restoreConsoleError();
+  });
+
+  describe('Source default (secure-by-default)', () => {
+    it('defaults httpConfig.cors to false when no http config is provided', () => {
+      // Regression for finding #26: the server default must NOT enable CORS.
+      // This assertion fails on the old `cors: true` default.
+      const server = new CreedSpaceMCPServer();
+      const httpConfig = (server as unknown as { httpConfig: { cors: boolean } })
+        .httpConfig;
+      expect(httpConfig.cors).toBe(false);
+    });
+
+    it('programmatic quick-start helper does not enable CORS by default', () => {
+      const source = readFileSync(path.resolve(__dirname, '../src/index.ts'), 'utf8');
+      const quickStart = source.slice(source.indexOf('export async function startCreedSpaceServer'));
+
+      expect(quickStart).not.toContain('cors: true');
+      expect(quickStart).toContain('cors: false');
+    });
+  });
+
+  describe('CORS default (secure-by-default)', () => {
+    it('does not emit Access-Control-Allow-Origin when CORS is disabled', async () => {
+      handle = await startTransport({ corsEnabled: false });
+
+      // A browser cross-origin request carries an Origin header. With CORS off,
+      // the server must not reflect/allow the origin, so the browser blocks the
+      // cross-origin read.
+      const res = await fetch(`${BASE_URL}/health`, {
+        headers: { Origin: 'http://evil.example' },
+      });
+
+      expect(res.headers.get('access-control-allow-origin')).toBeNull();
+    });
+
+    it('refuses wildcard CORS without an API key', async () => {
+      await expect(startTransport({ corsEnabled: true })).rejects.toThrow(/wildcard CORS|API key/i);
+    });
+
+    it('emits Access-Control-Allow-Origin when CORS has an explicit allowlist', async () => {
+      handle = await startTransport({
+        corsEnabled: true,
+        corsOrigins: ['http://localhost:3000'],
+      });
+
+      const res = await fetch(`${BASE_URL}/health`, {
+        headers: { Origin: 'http://localhost:3000' },
+      });
+
+      expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:3000');
+    });
+  });
+
+  describe('Startup guard: unauthenticated non-loopback bind (finding REWIND-FRESH-004)', () => {
+    // The guard reads MCP_ALLOW_INSECURE_HTTP at call time; isolate it so one
+    // test cannot leak the opt-out into a later one (which would silently stop
+    // the throwing tests from throwing).
+    let savedAllowInsecure: string | undefined;
+
+    beforeEach(() => {
+      savedAllowInsecure = process.env.MCP_ALLOW_INSECURE_HTTP;
+      delete process.env.MCP_ALLOW_INSECURE_HTTP;
+    });
+
+    afterEach(() => {
+      if (savedAllowInsecure === undefined) {
+        delete process.env.MCP_ALLOW_INSECURE_HTTP;
+      } else {
+        process.env.MCP_ALLOW_INSECURE_HTTP = savedAllowInsecure;
+      }
+    });
+
+    it('THROWS on a non-loopback host (0.0.0.0) with no apiKey', async () => {
+      // On the old code this resolves a live, unauthenticated server bound to
+      // all interfaces; the guard now refuses to start. No handle is created,
+      // so nothing needs cleanup.
+      await expect(
+        startTransport({ host: '0.0.0.0', corsEnabled: false })
+      ).rejects.toThrow(/MCP_ALLOW_INSECURE_HTTP|API key/i);
+    });
+
+    it('does NOT throw on a non-loopback host when an apiKey is set', async () => {
+      handle = await startTransport({
+        host: '0.0.0.0',
+        corsEnabled: false,
+        apiKey: 'test-secret-key',
+      });
+      expect(handle).toBeDefined();
+    });
+
+    it('does NOT throw on a loopback host (127.0.0.1) with no apiKey', async () => {
+      handle = await startTransport({ host: '127.0.0.1', corsEnabled: false });
+      expect(handle).toBeDefined();
+    });
+
+    it('does NOT throw on a non-loopback host with no apiKey when MCP_ALLOW_INSECURE_HTTP=true', async () => {
+      process.env.MCP_ALLOW_INSECURE_HTTP = 'true';
+      handle = await startTransport({ host: '0.0.0.0', corsEnabled: false });
+      expect(handle).toBeDefined();
+    });
+  });
+
+  describe('Bearer auth when apiKey is configured', () => {
+    const apiKey = 'test-secret-key';
+
+    it('rejects /mcp POST with no Authorization header (401)', async () => {
+      handle = await startTransport({ corsEnabled: false, apiKey });
+
+      const res = await fetch(`${BASE_URL}/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/list',
+          params: {},
+        }),
+      });
+
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects /mcp POST with an incorrect Bearer token (403)', async () => {
+      handle = await startTransport({ corsEnabled: false, apiKey });
+
+      const res = await fetch(`${BASE_URL}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer wrong-token',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/list',
+          params: {},
+        }),
+      });
+
+      expect(res.status).toBe(403);
+    });
+  });
+});

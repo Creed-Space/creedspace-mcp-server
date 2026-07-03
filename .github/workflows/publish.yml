@@ -1,0 +1,118 @@
+name: Publish to NPM
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Build TypeScript
+        run: npm run build
+      
+      - name: Check types
+        run: npx tsc --noEmit
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build package
+        run: npm run build
+      
+      - name: Update version if manual trigger
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          # Validate version format (semver: X.Y.Z or X.Y.Z-suffix)
+          if ! [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9._-]+)?$ ]]; then
+            echo "::error::Invalid version format: $INPUT_VERSION (expected: X.Y.Z or X.Y.Z-suffix)"
+            exit 1
+          fi
+          npm version "$INPUT_VERSION" --no-git-tag-version
+      
+      - name: Publish to NPM with provenance (Trusted Publishing)
+        run: npm publish --provenance --access public
+      
+      - name: Create GitHub Release
+        if: github.event_name == 'push'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            ## Changes in this release
+            - See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+            
+            ## Installation
+            ```bash
+            npm install creedspace-mcp-server@latest
+            # or
+            npx creedspace-mcp-server --persona ambassador
+            ```
+          draft: false
+          prerelease: false
+
+  notify:
+    needs: publish
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Send notification
+        uses: 8398a7/action-slack@v3
+        if: env.SLACK_WEBHOOK_URL != ''
+        with:
+          status: ${{ job.status }}
+          text: |
+            NPM Package Published: creedspace-mcp-server
+            Version: ${{ github.ref_name }}
+            Status: ${{ job.status }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

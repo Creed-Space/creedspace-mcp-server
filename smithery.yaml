@@ -1,0 +1,59 @@
+# Smithery configuration for Creed Space MCP Server
+# Documentation: https://smithery.ai/docs/build/project-config/smithery.yaml
+#
+# This file enables listing on Smithery.ai marketplace
+# After creation, publish with: smithery publish --repo=Creed-Space/creedspace-mcp-server
+
+# Server type: stdio (subprocess communication) or http (remote server)
+startCommand:
+  type: stdio
+
+# Configuration schema for user customization
+# Defines what users can configure when connecting to this MCP server
+configSchema:
+  type: object
+  properties:
+    persona:
+      type: string
+      description: "AI persona to use for safety guardrails. Each persona enforces specific values and behaviors."
+      enum:
+        - ambassador  # Professional communication
+        - nanny       # Child-safe interactions
+        - sentinel    # Privacy and security focus
+        - godparent   # Religious and ethical guidance
+        - muse        # Creative exploration
+        - anchor      # Reality grounding
+      default: ambassador
+    apiUrl:
+      type: string
+      description: "Creed Space API URL for fetching constitutions and personas"
+      default: "https://api.creed.space"
+    apiKey:
+      type: string
+      description: "Optional API key for authenticated access (enables additional features and higher rate limits)"
+    cacheTtl:
+      type: number
+      description: "Cache TTL in milliseconds for constitution data"
+      default: 300000
+    offline:
+      type: boolean
+      description: "Enable offline mode with cached data (useful for air-gapped environments)"
+      default: false
+
+# Command function that generates the CLI command to start the MCP server
+# This JavaScript arrow function receives the user's config and returns the command spec
+commandFunction:
+  |-
+  (config) => ({
+    command: 'npx',
+    args: [
+      '@creedspace/mcp-server',
+      '--persona', config.persona || 'ambassador',
+      ...(config.offline ? ['--offline'] : []),
+      ...(config.cacheTtl ? ['--cache-ttl', String(config.cacheTtl)] : [])
+    ],
+    env: {
+      CREEDSPACE_API_URL: config.apiUrl || 'https://api.creed.space',
+      ...(config.apiKey ? { CREEDSPACE_API_KEY: config.apiKey } : {})
+    }
+  })
