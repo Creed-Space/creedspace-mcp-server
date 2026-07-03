@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "creedspace-mcp": "./dist/cli.js"
+    "creedspace-mcp": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -37,7 +37,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Creed-Space/creedspace-mcp-server.git"
+    "url": "git+https://github.com/Creed-Space/creedspace-mcp-server.git"
   },
   "homepage": "https://www.creed.space",
   "dependencies": {
