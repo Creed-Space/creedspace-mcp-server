@@ -21,6 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added API key validation
 - Enhanced CORS configuration
 
+## [1.1.2] - 2026-07-03
+### Security
+- **Rate limiting** on the HTTP `/mcp` endpoint (per-IP, in-memory; default 120 req/min, override via `CREEDSPACE_RATE_LIMIT`). `/health` is exempt so platform health probes never trip it; a 429 returns a JSON-RPC error (code -32029).
+- **`trust proxy` = 1 hop** so the limiter keys on the real client IP behind Render's / a gateway's load balancer, not a spoofable `X-Forwarded-For` wildcard.
+- **Explicit JSON body-size cap** (`express.json({ limit: '1mb' })`, override via `CREEDSPACE_MAX_BODY`) to reject oversized-payload abuse.
+- **Security headers** on every response: `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`; the `X-Powered-By` header is disabled.
+- The wildcard-CORS startup guard now honours the same `MCP_ALLOW_INSECURE_HTTP=true` opt-out as the non-loopback-bind guard, so an intentionally-public (gateway/proxy-fronted) deployment can serve anonymous CORS without an API key.
+
+### Changed
+- `creedspace-mcp --version` now reports the real package version (was hard-coded to `1.1.0`), sourced from `version.ts`.
+
+### Added
+- `express-rate-limit` as a direct dependency.
+- Regression test covering the CORS guard opt-out under `MCP_ALLOW_INSECURE_HTTP=true`.
+
 ## [1.1.1] - 2026-07-03
 ### Added
 - `LICENSE` file (MIT) — the license was declared in `package.json` but no file was present.

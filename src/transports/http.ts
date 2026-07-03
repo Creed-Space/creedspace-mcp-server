@@ -7,6 +7,7 @@
 
 import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import { randomUUID } from 'crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -73,17 +74,37 @@ export async function startHttpTransport(
         `(127.0.0.1 / localhost / ::1), or set MCP_ALLOW_INSECURE_HTTP=true to opt out.`
     );
   }
-  if (config.corsEnabled && !config.apiKey && (config.corsOrigins ?? []).length === 0) {
+  if (
+    config.corsEnabled &&
+    !config.apiKey &&
+    (config.corsOrigins ?? []).length === 0 &&
+    process.env.MCP_ALLOW_INSECURE_HTTP !== 'true'
+  ) {
     throw new Error(
       'Refusing to enable wildcard CORS without an API key. ' +
-        'Set an API key or configure explicit CORS origins.'
+        'Set an API key, configure explicit CORS origins, or set ' +
+        'MCP_ALLOW_INSECURE_HTTP=true to allow anonymous public access.'
     );
   }
 
   const app: Application = express();
 
-  // Parse JSON bodies
-  app.use(express.json());
+  // Hardening for network-reachable HTTP exposure (Render / gateway-fronted).
+  app.disable('x-powered-by');
+  // Exactly one proxy sits in front of us (Render's load balancer / the gateway);
+  // trust one hop so req.ip is the real client for rate limiting. Deliberately
+  // NOT `true`, which would let any client spoof X-Forwarded-For and evade it.
+  app.set('trust proxy', 1);
+
+  // Minimal security headers appropriate for a JSON API (no HTML is served).
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
+
+  // Parse JSON bodies with an explicit size cap to reject oversized-payload abuse.
+  app.use(express.json({ limit: process.env.CREEDSPACE_MAX_BODY || '1mb' }));
 
   // CORS configuration
   if (config.corsEnabled) {
@@ -134,8 +155,25 @@ export async function startHttpTransport(
     });
   });
 
+  // Per-IP rate limit on the MCP endpoint. In-memory store: correct for a single
+  // instance (our deploy); horizontal scale-out would need a shared store. The
+  // /health route is intentionally left unlimited so platform probes never trip
+  // it. Override the ceiling via CREEDSPACE_RATE_LIMIT (requests/minute/IP).
+  const parsedLimit = Number.parseInt(process.env.CREEDSPACE_RATE_LIMIT ?? '', 10);
+  const mcpRateLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 120,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: {
+      jsonrpc: '2.0',
+      error: { code: -32029, message: 'Rate limit exceeded — slow down and retry shortly.' },
+      id: null,
+    },
+  });
+
   // MCP endpoint - handles all MCP protocol messages
-  app.all('/mcp', async (req: Request, res: Response) => {
+  app.all('/mcp', mcpRateLimiter, async (req: Request, res: Response) => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
 
     // For stateless mode, create a new transport for each request

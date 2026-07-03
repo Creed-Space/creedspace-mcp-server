@@ -176,6 +176,16 @@ describe('HTTP Transport Security', () => {
       handle = await startTransport({ host: '0.0.0.0', corsEnabled: false });
       expect(handle).toBeDefined();
     });
+
+    it('does NOT refuse wildcard CORS when MCP_ALLOW_INSECURE_HTTP=true', async () => {
+      // The public / gateway-fronted deploy runs cors-enabled, no apiKey, and no
+      // explicit origins; the same opt-out that relaxes the non-loopback bind
+      // guard must also relax the wildcard-CORS guard, or the service fails to
+      // boot (regression guard for the hosted Render/Smithery endpoint).
+      process.env.MCP_ALLOW_INSECURE_HTTP = 'true';
+      handle = await startTransport({ host: '0.0.0.0', corsEnabled: true });
+      expect(handle).toBeDefined();
+    });
   });
 
   describe('Bearer auth when apiKey is configured', () => {

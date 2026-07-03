@@ -10,7 +10,7 @@
 export const CREED_VERSION = '2.1.4';
 
 // MCP server package version (should match package.json)
-export const MCP_SERVER_VERSION = '1.1.1';
+export const MCP_SERVER_VERSION = '1.1.2';
 
 // MCP protocol version
 export const MCP_PROTOCOL_VERSION = '0.3.0';

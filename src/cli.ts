@@ -5,6 +5,7 @@ import { CreedSpaceMCPServer } from './server.js';
 import { CreedSpaceConfig, HttpConfig } from './types.js';
 import { config as loadEnv } from 'dotenv';
 import * as fs from 'fs';
+import { MCP_SERVER_VERSION } from './version.js';
 import { sanitizeMcpServerConfigForLog } from './cli-logging.js';
 
 // Load environment variables
@@ -47,7 +48,7 @@ function mergeHttpConfig(
 program
   .name('creedspace-mcp')
   .description('Universal MCP server for Creed Space - AI safety guardrails in 10 seconds')
-  .version('1.1.0')
+  .version(MCP_SERVER_VERSION)
   .option('-p, --persona <id>', 'Set the active persona', 'ambassador')
   .option(
     '-u, --url <url>',
