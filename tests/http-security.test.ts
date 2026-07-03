@@ -228,4 +228,47 @@ describe('HTTP Transport Security', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('v1.1.3 error handling & method restriction (public-endpoint hardening)', () => {
+    it('returns a clean JSON-RPC parse error (no stack trace / install paths) on malformed JSON', async () => {
+      handle = await startTransport({ corsEnabled: false });
+
+      const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+        },
+        body: '{"jsonrpc":"2.0", bad json',
+      });
+      const text = await res.text();
+
+      expect(res.status).toBe(400);
+      // CWE-209 regression: the response must not leak stack frames or the
+      // server's absolute install path.
+      expect(text).not.toMatch(/SyntaxError|at JSON\.parse|node_modules|\/usr\/local|node:internal/);
+      expect(JSON.parse(text).error.code).toBe(-32700);
+    });
+
+    it('rejects GET /mcp in stateless mode with 405 (kills the idle-SSE hold)', async () => {
+      handle = await startTransport({ corsEnabled: false, stateless: true });
+
+      const res = await fetch(`http://${handle.host}:${handle.port}/mcp`, {
+        method: 'GET',
+        headers: { Accept: 'application/json, text/event-stream' },
+      });
+
+      expect(res.status).toBe(405);
+      expect(res.headers.get('allow')).toBe('POST');
+      expect(JSON.parse(await res.text()).error.code).toBe(-32600);
+    });
+
+    it('sets Strict-Transport-Security on responses', async () => {
+      handle = await startTransport({ corsEnabled: false });
+
+      const res = await fetch(`http://${handle.host}:${handle.port}/health`);
+
+      expect(res.headers.get('strict-transport-security')).toMatch(/max-age=\d+/);
+    });
+  });
 });

@@ -6,20 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-### Added
-- Analytics module for privacy-respecting usage tracking
-- API key management system
-- CI/CD pipeline with GitHub Actions
-- Enhanced TypeScript types
-- Comprehensive documentation
 
-### Changed
-- Improved error handling with better messages
-- Optimized caching strategy
-
+## [1.1.3] - 2026-07-03
 ### Security
-- Added API key validation
-- Enhanced CORS configuration
+- **Error handling**: unhandled request errors (a malformed JSON body, an over-cap payload) now return a clean JSON-RPC error instead of Express's default HTML page, which leaked a full Node.js stack trace and the server's absolute install paths (CWE-209). Independent of `NODE_ENV`.
+- **`/mcp` method restriction**: in stateless mode only `POST` is accepted; `GET`/`DELETE` return `405`. Previously a `GET` opened a server-sent-event stream held open indefinitely with no session to feed it — an unauthenticated connection-exhaustion vector.
+- **HSTS**: responses now send `Strict-Transport-Security: max-age=63072000; includeSubDomains`.
 
 ## [1.1.2] - 2026-07-03
 ### Security

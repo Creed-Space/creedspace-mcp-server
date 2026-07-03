@@ -100,6 +100,10 @@ export async function startHttpTransport(
   app.use((_req: Request, res: Response, next: NextFunction) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    // The hosted deploy is HTTPS-only (the edge 301-redirects HTTP->HTTPS); pin
+    // it so an on-path attacker cannot SSL-strip the first request. Browsers
+    // ignore this header over plain HTTP, so it is harmless for local dev.
+    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
     next();
   });
 
@@ -174,58 +178,124 @@ export async function startHttpTransport(
 
   // MCP endpoint - handles all MCP protocol messages
   app.all('/mcp', mcpRateLimiter, async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-
-    // For stateless mode, create a new transport for each request
-    if (config.stateless) {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined, // Stateless mode
-        enableJsonResponse: config.enableJsonResponse ?? true,
-      });
-
-      await server.connect(transport);
-
-      try {
-        await transport.handleRequest(req, res, req.body);
-      } finally {
-        await transport.close();
+    try {
+      // In stateless mode there is no session, so GET (the server->client SSE
+      // notification stream) and DELETE (session teardown) have no meaning. Left
+      // to fall through, a GET holds an idle event-stream open indefinitely — an
+      // unauthenticated connection-exhaustion vector — so accept only POST here.
+      if (config.stateless && req.method !== 'POST') {
+        res
+          .status(405)
+          .set('Allow', 'POST')
+          .json({
+            jsonrpc: '2.0',
+            error: { code: -32600, message: 'Only POST is supported in stateless mode' },
+            id: null,
+          });
+        return;
       }
+
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+      // For stateless mode, create a new transport for each request
+      if (config.stateless) {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: undefined, // Stateless mode
+          enableJsonResponse: config.enableJsonResponse ?? true,
+        });
+
+        await server.connect(transport);
+
+        try {
+          await transport.handleRequest(req, res, req.body);
+        } finally {
+          await transport.close();
+        }
+        return;
+      }
+
+      // Stateful mode - reuse or create transport per session
+      let transport: StreamableHTTPServerTransport;
+
+      if (sessionId && transports.has(sessionId)) {
+        // Reuse existing transport
+        transport = transports.get(sessionId)!;
+      } else if (!sessionId && isInitializeRequest(req.body)) {
+        // Create new transport for initialization
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          enableJsonResponse: config.enableJsonResponse ?? true,
+          onsessioninitialized: (sid) => {
+            transports.set(sid, transport);
+            console.error(`[HTTP] Session initialized: ${sid}`);
+          },
+          onsessionclosed: (sid) => {
+            transports.delete(sid);
+            console.error(`[HTTP] Session closed: ${sid}`);
+          },
+        });
+
+        await server.connect(transport);
+      } else if (sessionId) {
+        // Session not found
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      } else {
+        // Non-init request without session
+        res.status(400).json({ error: 'Session ID required for non-initialization requests' });
+        return;
+      }
+
+      await transport.handleRequest(req, res, req.body);
+    } catch (err) {
+      // Never let a handler throw escape: an unhandled promise rejection makes
+      // cli.ts call process.exit(1), taking the whole public server down for
+      // every client (a worse DoS than the idle-SSE hold). Log and, if the
+      // response has not started, return a clean JSON-RPC 500 with no stack.
+      console.error('[HTTP] /mcp handler error:', (err as Error)?.message ?? err);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null,
+        });
+      }
+    }
+  });
+
+  // Error handler — MUST be registered last. Maps body-parser and any unhandled
+  // errors to clean JSON-RPC responses so we never leak a stack trace or the
+  // server's install paths (CWE-209) — independent of NODE_ENV, which the
+  // default Express handler relies on. Express only invokes 4-arg middleware on
+  // error.
+  app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      next(err);
       return;
     }
-
-    // Stateful mode - reuse or create transport per session
-    let transport: StreamableHTTPServerTransport;
-
-    if (sessionId && transports.has(sessionId)) {
-      // Reuse existing transport
-      transport = transports.get(sessionId)!;
-    } else if (!sessionId && isInitializeRequest(req.body)) {
-      // Create new transport for initialization
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        enableJsonResponse: config.enableJsonResponse ?? true,
-        onsessioninitialized: (sid) => {
-          transports.set(sid, transport);
-          console.error(`[HTTP] Session initialized: ${sid}`);
-        },
-        onsessionclosed: (sid) => {
-          transports.delete(sid);
-          console.error(`[HTTP] Session closed: ${sid}`);
-        },
+    const type = (err as { type?: string } | null)?.type;
+    if (type === 'entity.parse.failed') {
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: { code: -32700, message: 'Parse error: request body is not valid JSON' },
+        id: null,
       });
-
-      await server.connect(transport);
-    } else if (sessionId) {
-      // Session not found
-      res.status(404).json({ error: 'Session not found' });
-      return;
-    } else {
-      // Non-init request without session
-      res.status(400).json({ error: 'Session ID required for non-initialization requests' });
       return;
     }
-
-    await transport.handleRequest(req, res, req.body);
+    if (type === 'entity.too.large') {
+      res.status(413).json({
+        jsonrpc: '2.0',
+        error: { code: -32600, message: 'Request payload too large' },
+        id: null,
+      });
+      return;
+    }
+    console.error('[HTTP] Unhandled request error:', (err as Error)?.message ?? err);
+    res.status(500).json({
+      jsonrpc: '2.0',
+      error: { code: -32603, message: 'Internal server error' },
+      id: null,
+    });
   });
 
   // Start HTTP server
