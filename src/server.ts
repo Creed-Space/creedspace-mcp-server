@@ -135,7 +135,9 @@ export class CreedSpaceMCPServer {
           }
 
           case 'set_persona': {
-            const args = validateToolArgs(SetPersonaSchema, rawArgs);
+            const args = validateToolArgs(SetPersonaSchema, {
+              personaId: rawArgs?.persona_id,
+            });
             const personaId = args.personaId;
 
             // Verify persona exists
@@ -333,10 +335,19 @@ export class CreedSpaceMCPServer {
           }
 
           case 'adjudicate': {
+            const rawContext = rawArgs?.context as Record<string, unknown> | undefined;
             const args = validateToolArgs(AdjudicateSchema, {
               question: rawArgs?.question,
               personaId: rawArgs?.persona_id ?? this.currentPersona,
-              context: rawArgs?.context,
+              context: rawContext
+                ? {
+                    constitutions: rawContext.constitutions,
+                    adherenceLevel: rawContext.adherence_level,
+                    influenceScope: rawContext.influence_scope,
+                    userId: rawContext.user_id,
+                    sessionId: rawContext.session_id,
+                  }
+                : undefined,
             });
 
             // Call PDP adjudicate API
@@ -420,7 +431,10 @@ export class CreedSpaceMCPServer {
           }
 
           case 'attest_response': {
-            const args = validateToolArgs(AttestResponseSchema, rawArgs ?? {});
+            const args = validateToolArgs(AttestResponseSchema, {
+              response: rawArgs?.response,
+              personaId: rawArgs?.persona_id ?? this.currentPersona,
+            });
 
             // Get current constitution for validation
             const currentHash = this.client.getCreedHash();
@@ -515,7 +529,16 @@ export class CreedSpaceMCPServer {
 
           case 'perform_multi_scale_handshake': {
             const args = validateToolArgs(MultiScaleHandshakeSchema, {
-              parties: rawArgs?.parties,
+              parties: Array.isArray(rawArgs?.parties)
+                ? rawArgs.parties.map((party) => {
+                    const p = (party ?? {}) as Record<string, unknown>;
+                    return {
+                      entityId: p.entity_id,
+                      scale: p.scale,
+                      capabilities: p.capabilities,
+                    };
+                  })
+                : rawArgs?.parties,
               invariants: rawArgs?.invariants,
             });
 
