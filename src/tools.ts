@@ -1,5 +1,26 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
+// Shared output-schema fragments -------------------------------------------
+
+/** Persona summary as returned by list_personas / get_active_persona. */
+const PERSONA_PROPERTIES = {
+  id: { type: 'string', description: 'Persona ID' },
+  name: { type: 'string', description: 'Human-readable persona name' },
+  icon: { type: 'string', description: 'Persona icon (emoji)' },
+  description: { type: 'string', description: 'Persona description' },
+} as const;
+
+/** UVC quality buckets. Every bucket is optional — the API omits empty ones. */
+const UVC_QUALITIES_SCHEMA = {
+  type: 'object',
+  description: 'Value qualities for the persona; null when UVC is not configured',
+  properties: {
+    desired: { type: 'array', items: { type: 'string' }, description: 'Desired qualities' },
+    disliked: { type: 'array', items: { type: 'string' }, description: 'Disliked qualities' },
+    never: { type: 'array', items: { type: 'string' }, description: 'Forbidden qualities' },
+  },
+} as const;
+
 export const CREEDSPACE_TOOLS: Tool[] = [
   {
     name: 'get_constitution',
@@ -16,6 +37,21 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: [],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        persona: { type: 'string', description: 'Human-readable persona name' },
+        icon: { type: 'string', description: 'Persona icon (emoji)' },
+        totalRules: { type: 'number', description: 'Total number of rules in the merged creed' },
+        content: { type: 'string', description: 'Merged constitution text' },
+        uvcToken: { type: 'string', description: 'UVC token, when configured for the persona' },
+        creedAttestation: {
+          type: 'string',
+          description: 'Attestation line binding this response to the active creed hash',
+        },
+      },
+      required: ['persona', 'totalRules', 'content'],
+    },
   },
   {
     name: 'list_personas',
@@ -23,6 +59,25 @@ export const CREEDSPACE_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        current: { type: 'string', description: 'Currently active persona ID for this session' },
+        available: {
+          type: 'array',
+          description: 'All personas available from the Creed Space API',
+          items: {
+            type: 'object',
+            properties: {
+              ...PERSONA_PROPERTIES,
+              active: { type: 'boolean', description: 'Whether the persona is active' },
+            },
+            required: ['id', 'name', 'icon', 'description', 'active'],
+          },
+        },
+      },
+      required: ['current', 'available'],
     },
   },
   {
@@ -39,6 +94,14 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: ['persona_id'],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        ...PERSONA_PROPERTIES,
+        message: { type: 'string', description: 'Human-readable confirmation of the switch' },
+      },
+      required: ['id', 'name', 'icon', 'description', 'message'],
+    },
   },
   {
     name: 'get_uvc_qualities',
@@ -53,6 +116,18 @@ export const CREEDSPACE_TOOLS: Tool[] = [
         },
       },
       required: [],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        personaId: { type: 'string', description: 'The persona the qualities belong to' },
+        configured: {
+          type: 'boolean',
+          description: 'False when no UVC qualities are configured for the persona',
+        },
+        qualities: { ...UVC_QUALITIES_SCHEMA, type: ['object', 'null'] },
+      },
+      required: ['personaId', 'configured'],
     },
   },
   {
@@ -69,6 +144,18 @@ export const CREEDSPACE_TOOLS: Tool[] = [
         },
       },
       required: [],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        personaId: { type: 'string', description: 'The persona the prompt was built for' },
+        systemPrompt: { type: 'string', description: 'Assembled system prompt text' },
+        creedAttestation: {
+          type: 'string',
+          description: 'Attestation line binding the prompt to the active creed hash',
+        },
+      },
+      required: ['personaId', 'systemPrompt', 'creedAttestation'],
     },
   },
   {
@@ -100,6 +187,29 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: [],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        personaId: { type: 'string', description: 'The persona the export was built for' },
+        personaName: { type: 'string', description: 'Human-readable persona name' },
+        preview: { type: 'string', description: 'Rendered export preview text' },
+        includeSystemPrompt: {
+          type: 'boolean',
+          description: 'Whether the system prompt was included',
+        },
+        includeConstitutions: {
+          type: 'boolean',
+          description: 'Whether constitutions were included',
+        },
+        includeUvc: { type: 'boolean', description: 'Whether UVC qualities were included' },
+        constitutionIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Constitution IDs included in the export',
+        },
+      },
+      required: ['personaId', 'personaName', 'preview'],
+    },
   },
   {
     name: 'get_constitution_by_id',
@@ -113,6 +223,21 @@ export const CREEDSPACE_TOOLS: Tool[] = [
         },
       },
       required: ['constitution_id'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Constitution ID' },
+        name: { type: 'string', description: 'Constitution name' },
+        content: { type: 'string', description: 'Full constitution text' },
+        personaId: { type: 'string', description: 'Owning persona ID, when persona-scoped' },
+        isSystemConstitution: {
+          type: 'boolean',
+          description: 'True for built-in system constitutions',
+        },
+        uvcQualities: UVC_QUALITIES_SCHEMA,
+      },
+      required: ['id', 'name', 'content', 'isSystemConstitution'],
     },
   },
   {
@@ -132,6 +257,30 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: [],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Echo of the search query, when one was supplied' },
+        persona: { type: 'string', description: 'Persona filter applied, or "all"' },
+        results: { type: 'number', description: 'Number of matching constitutions' },
+        constitutions: {
+          type: 'array',
+          description: 'Matching constitutions (content truncated to a 200-character preview)',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Constitution ID' },
+              name: { type: 'string', description: 'Constitution name' },
+              persona: { type: 'string', description: 'Owning persona ID, when persona-scoped' },
+              isSystem: { type: 'boolean', description: 'True for built-in system constitutions' },
+              preview: { type: 'string', description: 'First 200 characters of the content' },
+            },
+            required: ['id', 'name', 'isSystem', 'preview'],
+          },
+        },
+      },
+      required: ['persona', 'results', 'constitutions'],
+    },
   },
   {
     name: 'get_active_persona',
@@ -140,6 +289,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       type: 'object',
       properties: {},
     },
+    outputSchema: {
+      type: 'object',
+      properties: { ...PERSONA_PROPERTIES },
+      required: ['id', 'name', 'icon', 'description'],
+    },
   },
   {
     name: 'clear_cache',
@@ -147,6 +301,14 @@ export const CREEDSPACE_TOOLS: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        cleared: { type: 'boolean', description: 'True once the local cache has been cleared' },
+        message: { type: 'string', description: 'Human-readable confirmation' },
+      },
+      required: ['cleared', 'message'],
     },
   },
   {
@@ -199,6 +361,49 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: ['question'],
     },
+    // Passthrough of the PDP decision kernel. Fields mirror the upstream
+    // DecisionKernel model, but the PDP versions independently of this server,
+    // so nothing is marked required and extra fields are permitted.
+    outputSchema: {
+      type: 'object',
+      description: 'Policy decision kernel returned by the Creed Space PDP',
+      properties: {
+        decision: {
+          type: 'string',
+          description:
+            'Policy verdict (allow, block, modify, escalate, permit, forbid, divert, depends)',
+        },
+        rationale: { type: 'string', description: 'Short explanation of the decision' },
+        norms: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Norms applied when reaching the decision',
+        },
+        precedence: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Precedence ordering used to resolve conflicting norms',
+        },
+        sources: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Constitution sources cited by the decision',
+        },
+        caveats: { type: 'array', items: { type: 'string' }, description: 'Caveats to the verdict' },
+        nonce: {
+          type: ['string', 'null'],
+          description: 'Echo of the request nonce; null when none was supplied',
+        },
+        hash: { type: 'string', description: 'Kernel hash for verification' },
+        timestamp: { type: 'number', description: 'Unix timestamp of the decision' },
+        transparency: {
+          type: ['object', 'null'],
+          description: 'Transparency detail; null unless a transparency level was requested',
+        },
+      },
+      required: [],
+      additionalProperties: true,
+    },
   },
   {
     name: 'get_anchor',
@@ -221,6 +426,21 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: [],
     },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        personaId: { type: 'string', description: 'The persona the anchor was built for' },
+        persona: { type: 'string', description: 'Human-readable persona name' },
+        anchor: { type: 'string', description: 'Compact anchor text' },
+        truncated: {
+          type: 'boolean',
+          description: 'True when the anchor was cut to fit max_length',
+        },
+        maxLength: { type: 'number', description: 'Maximum length applied' },
+        totalRules: { type: 'number', description: 'Total rules in the merged creed' },
+      },
+      required: ['personaId', 'persona', 'anchor', 'truncated', 'maxLength'],
+    },
   },
   {
     name: 'attest_response',
@@ -239,6 +459,35 @@ export const CREEDSPACE_TOOLS: Tool[] = [
         },
       },
       required: ['response'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['pass', 'warn', 'fail'],
+          description: 'fail on violations, warn on warnings only, otherwise pass',
+        },
+        creedHash: {
+          type: ['string', 'null'],
+          description: 'Active creed hash, or null when no creed has been fetched yet',
+        },
+        violations: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Forbidden qualities detected in the response',
+        },
+        warnings: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Non-blocking issues, e.g. a missing attestation',
+        },
+        attestationPresent: {
+          type: 'boolean',
+          description: 'Whether the response embeds the active creed hash',
+        },
+      },
+      required: ['status', 'violations', 'warnings', 'attestationPresent'],
     },
   },
   {
@@ -263,6 +512,23 @@ export const CREEDSPACE_TOOLS: Tool[] = [
         },
       },
       required: [],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        anchored: {
+          type: 'boolean',
+          description: 'True when a mini-anchor was returned rather than a plain acknowledgement',
+        },
+        messageCount: { type: 'number', description: 'Message count supplied by the caller' },
+        personaId: { type: 'string', description: 'The persona used for re-anchoring' },
+        text: { type: 'string', description: 'Mini-anchor text, or the heartbeat acknowledgement' },
+        persona: {
+          type: 'string',
+          description: 'Human-readable persona name; present only when anchored',
+        },
+      },
+      required: ['anchored', 'messageCount', 'personaId', 'text'],
     },
   },
   {
@@ -316,6 +582,39 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       },
       required: ['parties'],
     },
+    // Passthrough of the safety-stack handshake response. Extra fields are
+    // permitted because the upstream API versions independently.
+    outputSchema: {
+      type: 'object',
+      description: 'Handshake result returned by the Creed Space safety stack',
+      properties: {
+        synthesized_constitution: {
+          type: ['object', 'null'],
+          description: 'Merged UVC components agreed across parties; null when no synthesis was reached',
+        },
+        party_weights: {
+          type: 'object',
+          description: 'Weight assigned to each party in the synthesis',
+        },
+        scale_attestations: {
+          type: 'object',
+          description: 'Attestation record per alignment scale',
+        },
+        precedence_decisions: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Precedence decisions taken to resolve competing party values',
+        },
+        conflicts: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Conflicts detected between parties',
+        },
+        rationale: { type: 'string', description: 'Explanation of the handshake outcome' },
+      },
+      required: [],
+      additionalProperties: true,
+    },
   },
   {
     name: 'get_scale_attestation',
@@ -339,6 +638,28 @@ export const CREEDSPACE_TOOLS: Tool[] = [
         },
       },
       required: ['entity_id', 'scale'],
+    },
+    // Passthrough. The upstream endpoint returns one of three shapes: a chain
+    // wrapper (include_chain), a bare attestation record, or a null-attestation
+    // placeholder — so no field is required and extras are permitted.
+    outputSchema: {
+      type: 'object',
+      description: 'Attestation record, attestation chain, or null-attestation placeholder',
+      properties: {
+        entity_id: { type: 'string', description: 'Entity the attestation belongs to' },
+        scale: { type: 'string', description: 'Alignment scale of the attestation' },
+        chain: {
+          type: 'array',
+          items: { type: 'object' },
+          description: 'Parent hash chain; present when include_chain was set',
+        },
+        attestation: {
+          type: ['object', 'null'],
+          description: 'Null when no attestation exists for the entity',
+        },
+      },
+      required: [],
+      additionalProperties: true,
     },
   },
 

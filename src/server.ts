@@ -29,6 +29,42 @@ function timeoutSignal(): AbortSignal {
   return AbortSignal.timeout(PDP_REQUEST_TIMEOUT_MS);
 }
 
+/**
+ * Build a tool result whose text content is the pretty-printed serialization of
+ * the structured payload. Every tool declares an outputSchema, and the MCP spec
+ * requires a conforming `structuredContent` alongside the text fallback.
+ */
+function jsonResult(structuredContent: Record<string, unknown>) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(structuredContent, null, 2) }],
+    structuredContent,
+  };
+}
+
+/**
+ * Build a tool result whose text content is human-readable prose, paired with a
+ * structured payload carrying the same information in machine-readable form.
+ */
+function textResult(text: string, structuredContent: Record<string, unknown>) {
+  return {
+    content: [{ type: 'text' as const, text }],
+    structuredContent,
+  };
+}
+
+/**
+ * Normalize an opaque upstream API response into a structured-content object.
+ * The passthrough endpoints are declared `additionalProperties: true`, so a
+ * non-object payload is wrapped rather than dropped.
+ */
+function passthroughResult(payload: unknown) {
+  const structured =
+    payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : { result: payload };
+  return jsonResult(structured);
+}
+
 export class CreedSpaceMCPServer {
   private server: Server;
   private client: CreedSpaceClient;
@@ -88,50 +124,28 @@ export class CreedSpaceMCPServer {
             const personaId = args.personaId;
             const constitution = await this.client.getMergedConstitution(personaId);
             const creedAttestation = this.client.getCreedAttestation();
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      persona: constitution.persona.name,
-                      icon: constitution.persona.icon,
-                      totalRules: constitution.totalRules,
-                      content: constitution.mergedContent,
-                      uvcToken: constitution.uvcToken,
-                      creedAttestation,
-                    },
-                    null,
-                    2
-                  ),
-                },
-              ],
-            };
+            return jsonResult({
+              persona: constitution.persona.name,
+              icon: constitution.persona.icon,
+              totalRules: constitution.totalRules,
+              content: constitution.mergedContent,
+              uvcToken: constitution.uvcToken,
+              creedAttestation,
+            });
           }
 
           case 'list_personas': {
             const personas = await this.client.getPersonas();
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      current: this.currentPersona,
-                      available: personas.map((p) => ({
-                        id: p.id,
-                        name: p.name,
-                        icon: p.icon,
-                        description: p.description,
-                        active: p.isActive,
-                      })),
-                    },
-                    null,
-                    2
-                  ),
-                },
-              ],
-            };
+            return jsonResult({
+              current: this.currentPersona,
+              available: personas.map((p) => ({
+                id: p.id,
+                name: p.name,
+                icon: p.icon,
+                description: p.description,
+                active: p.isActive,
+              })),
+            });
           }
 
           case 'set_persona': {
@@ -145,14 +159,14 @@ export class CreedSpaceMCPServer {
             this.currentPersona = personaId;
             this.client.setPersona(personaId);
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Switched to ${persona.name} persona (${persona.icon}). ${persona.description}`,
-                },
-              ],
-            };
+            const message = `Switched to ${persona.name} persona (${persona.icon}). ${persona.description}`;
+            return textResult(message, {
+              id: persona.id ?? personaId,
+              name: persona.name,
+              icon: persona.icon,
+              description: persona.description,
+              message,
+            });
           }
 
           case 'get_uvc_qualities': {
@@ -163,24 +177,18 @@ export class CreedSpaceMCPServer {
             const uvc = await this.client.getUvcQualities(personaId);
 
             if (!uvc) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `No UVC qualities configured for ${personaId}`,
-                  },
-                ],
-              };
+              return textResult(`No UVC qualities configured for ${personaId}`, {
+                personaId,
+                configured: false,
+                qualities: null,
+              });
             }
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(uvc, null, 2),
-                },
-              ],
-            };
+            return jsonResult({
+              personaId,
+              configured: true,
+              qualities: uvc.qualities ?? null,
+            });
           }
 
           case 'get_system_prompt': {
@@ -190,14 +198,11 @@ export class CreedSpaceMCPServer {
             const systemPrompt = await this.client.getSystemPrompt(args.personaId);
             const creedAttestation = this.client.getCreedAttestation();
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `${systemPrompt}\n\n${creedAttestation}`,
-                },
-              ],
-            };
+            return textResult(`${systemPrompt}\n\n${creedAttestation}`, {
+              personaId: args.personaId,
+              systemPrompt,
+              creedAttestation,
+            });
           }
 
           case 'preview_export': {
@@ -227,14 +232,15 @@ export class CreedSpaceMCPServer {
 
             const preview = await this.client.getExportPreview(config);
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: preview,
-                },
-              ],
-            };
+            return textResult(preview, {
+              personaId: config.personaId,
+              personaName: config.personaName,
+              preview,
+              includeSystemPrompt: config.includeSystemPrompt,
+              includeConstitutions: config.includeConstitutions,
+              includeUvc: config.includeUvc,
+              constitutionIds: config.selectedConstitutionIds,
+            });
           }
 
           case 'get_constitution_by_id': {
@@ -249,14 +255,7 @@ export class CreedSpaceMCPServer {
               throw new Error(`Constitution not found: ${args.constitutionId}`);
             }
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(constitution, null, 2),
-                },
-              ],
-            };
+            return jsonResult({ ...constitution });
           }
 
           case 'search_constitutions': {
@@ -276,62 +275,34 @@ export class CreedSpaceMCPServer {
               );
             }
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      query: args.query,
-                      persona: args.personaId ?? 'all',
-                      results: constitutions.length,
-                      constitutions: constitutions.map((c) => ({
-                        id: c.id,
-                        name: c.name,
-                        persona: c.personaId,
-                        isSystem: c.isSystemConstitution,
-                        preview: c.content.substring(0, 200) + '...',
-                      })),
-                    },
-                    null,
-                    2
-                  ),
-                },
-              ],
-            };
+            return jsonResult({
+              query: args.query,
+              persona: args.personaId ?? 'all',
+              results: constitutions.length,
+              constitutions: constitutions.map((c) => ({
+                id: c.id,
+                name: c.name,
+                persona: c.personaId,
+                isSystem: c.isSystemConstitution,
+                preview: c.content.substring(0, 200) + '...',
+              })),
+            });
           }
 
           case 'get_active_persona': {
             const persona = await this.client.getPersona(this.currentPersona);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      id: persona.id,
-                      name: persona.name,
-                      icon: persona.icon,
-                      description: persona.description,
-                    },
-                    null,
-                    2
-                  ),
-                },
-              ],
-            };
+            return jsonResult({
+              id: persona.id ?? this.currentPersona,
+              name: persona.name,
+              icon: persona.icon,
+              description: persona.description,
+            });
           }
 
           case 'clear_cache': {
             this.client.clearCache();
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: 'Cache cleared successfully. Fresh data will be fetched on next request.',
-                },
-              ],
-            };
+            const message = 'Cache cleared successfully. Fresh data will be fetched on next request.';
+            return textResult(message, { cleared: true, message });
           }
 
           case 'adjudicate': {
@@ -378,14 +349,7 @@ export class CreedSpaceMCPServer {
             const kernel = await response.json();
 
             // Return the decision kernel as tool result
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(kernel, null, 2),
-                },
-              ],
-            };
+            return passthroughResult(kernel);
           }
 
           case 'get_anchor': {
@@ -417,17 +381,17 @@ export class CreedSpaceMCPServer {
 
             // Truncate if needed
             const maxLen = args.maxLength ?? 1500;
-            const truncatedAnchor =
-              anchor.length > maxLen ? anchor.substring(0, maxLen - 3) + '...' : anchor;
+            const truncated = anchor.length > maxLen;
+            const truncatedAnchor = truncated ? anchor.substring(0, maxLen - 3) + '...' : anchor;
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: truncatedAnchor,
-                },
-              ],
-            };
+            return textResult(truncatedAnchor, {
+              personaId: args.personaId,
+              persona: constitution.persona.name,
+              anchor: truncatedAnchor,
+              truncated,
+              maxLength: maxLen,
+              totalRules: constitution.totalRules,
+            });
           }
 
           case 'attest_response': {
@@ -470,14 +434,7 @@ export class CreedSpaceMCPServer {
               attestationPresent: hasAttestation,
             };
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
+            return jsonResult(result);
           }
 
           case 'heartbeat': {
@@ -506,24 +463,22 @@ export class CreedSpaceMCPServer {
                 `Persona: ${constitution.persona.name}`,
               ].join('\n');
 
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: miniAnchor,
-                  },
-                ],
-              };
+              return textResult(miniAnchor, {
+                anchored: true,
+                messageCount: args.messageCount,
+                personaId: args.personaId,
+                text: miniAnchor,
+                persona: constitution.persona.name,
+              });
             } else {
               // No anchor needed yet
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `[Heartbeat OK - Message ${args.messageCount}]`,
-                  },
-                ],
-              };
+              const ack = `[Heartbeat OK - Message ${args.messageCount}]`;
+              return textResult(ack, {
+                anchored: false,
+                messageCount: args.messageCount,
+                personaId: args.personaId,
+                text: ack,
+              });
             }
           }
 
@@ -552,14 +507,7 @@ export class CreedSpaceMCPServer {
               args.invariants
             );
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(response, null, 2),
-                },
-              ],
-            };
+            return passthroughResult(response);
           }
 
           case 'get_scale_attestation': {
@@ -576,14 +524,7 @@ export class CreedSpaceMCPServer {
               args.includeChain
             );
 
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(attestation, null, 2),
-                },
-              ],
-            };
+            return passthroughResult(attestation);
           }
 
           default:
