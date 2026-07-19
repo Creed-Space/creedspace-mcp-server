@@ -1,59 +1,36 @@
-# Smithery configuration for Creed Space MCP Server
-# Documentation: https://smithery.ai/docs/build/project-config/smithery.yaml
+# Smithery deployment config for the Creed Space MCP server.
+# Docs: https://smithery.ai/docs/build/project-config
 #
-# This file enables listing on Smithery.ai marketplace
-# After creation, publish with: smithery publish --repo=Creed-Space/creedspace-mcp-server
+# Deployed on Smithery as a custom container. The image (see Dockerfile)
+# defaults to stdio for the Docker MCP Catalog and `docker run -i` consumers;
+# Smithery flips it to Streamable HTTP via the `env` block below, which the CLI
+# reads (CREEDSPACE_TRANSPORT / CREEDSPACE_HOST). Smithery injects $PORT, which
+# the Dockerfile maps onto --port.
+runtime: container
 
-# Server type: stdio (subprocess communication) or http (remote server)
 startCommand:
-  type: stdio
+  type: http
+  # The server needs no credentials: it runs against the public Creed Space API
+  # (https://api.creed.space) with sensible defaults. The hosted instance serves
+  # the "ambassador" persona and the full tool set; persona/constitution can be
+  # chosen per call via tool arguments. Nothing to configure, so the schema is
+  # an empty object.
+  configSchema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  exampleConfig: {}
 
-# Configuration schema for user customization
-# Defines what users can configure when connecting to this MCP server
-configSchema:
-  type: object
-  properties:
-    persona:
-      type: string
-      description: "AI persona to use for safety guardrails. Each persona enforces specific values and behaviors."
-      enum:
-        - ambassador  # Professional communication
-        - nanny       # Child-safe interactions
-        - sentinel    # Privacy and security focus
-        - godparent   # Religious and ethical guidance
-        - muse        # Creative exploration
-        - anchor      # Reality grounding
-      default: ambassador
-    apiUrl:
-      type: string
-      description: "Creed Space API URL for fetching constitutions and personas"
-      default: "https://api.creed.space"
-    apiKey:
-      type: string
-      description: "Optional API key for authenticated access (enables additional features and higher rate limits)"
-    cacheTtl:
-      type: number
-      description: "Cache TTL in milliseconds for constitution data"
-      default: 300000
-    offline:
-      type: boolean
-      description: "Enable offline mode with cached data (useful for air-gapped environments)"
-      default: false
+build:
+  dockerfile: Dockerfile
+  dockerBuildPath: "."
 
-# Command function that generates the CLI command to start the MCP server
-# This JavaScript arrow function receives the user's config and returns the command spec
-commandFunction:
-  |-
-  (config) => ({
-    command: 'npx',
-    args: [
-      '@creedspace/mcp-server',
-      '--persona', config.persona || 'ambassador',
-      ...(config.offline ? ['--offline'] : []),
-      ...(config.cacheTtl ? ['--cache-ttl', String(config.cacheTtl)] : [])
-    ],
-    env: {
-      CREEDSPACE_API_URL: config.apiUrl || 'https://api.creed.space',
-      ...(config.apiKey ? { CREEDSPACE_API_KEY: config.apiKey } : {})
-    }
-  })
+# Run the container in Streamable HTTP mode for Smithery's gateway.
+# MCP_ALLOW_INSECURE_HTTP opts out of the server's "no unauthenticated
+# non-loopback bind" guard: safe here because the container is not publicly
+# exposed — Smithery's gateway is the only path in and handles client auth.
+# It is set ONLY here, so anyone running the image directly keeps the guard.
+env:
+  CREEDSPACE_TRANSPORT: "http"
+  CREEDSPACE_HOST: "0.0.0.0"
+  MCP_ALLOW_INSECURE_HTTP: "true"
