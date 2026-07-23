@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-07-23
+### Added
+- **Output schemas on all 16 tools.** Every tool now declares an `outputSchema` and returns a conforming `structuredContent` alongside its text block, so clients can consume tool results as typed data instead of parsing prose. Schemas for the three passthrough tools (`adjudicate`, `perform_multi_scale_handshake`, `get_scale_attestation`) name their known fields but stay open (`additionalProperties: true`, nothing required) because the upstream Creed Space API versions independently.
+- **Tool annotations on all 16 tools** (`title`, `readOnlyHint`, `openWorldHint`, plus `destructiveHint`/`idempotentHint` for state-changing tools), so hosts can classify a tool before calling it. No tool is destructive. `clear_cache` is the only closed-world tool; everything else reaches the Creed Space API.
+
+### Fixed
+- **Four tools rejected every call that used their advertised parameters.** `set_persona`, `attest_response` and `perform_multi_scale_handshake` passed raw snake_case MCP arguments into camelCase validation schemas, so `persona_id` / `entity_id` were never seen and validation always failed. `adjudicate` silently dropped its entire `context` sub-object, so `adherence_level` and `influence_scope` always fell back to defaults and influence tracking never received user or session IDs.
+
+### Changed
+- Tools that return JSON now serialize `structuredContent` verbatim into their text block, so the two representations cannot drift. Prose-returning tools (`get_system_prompt`, `preview_export`, `get_anchor`, `heartbeat`, `set_persona`) keep their existing text output unchanged.
+
 ## [1.1.3] - 2026-07-03
 ### Security
 - **Error handling**: unhandled request errors (a malformed JSON body, an over-cap payload) now return a clean JSON-RPC error instead of Express's default HTML page, which leaked a full Node.js stack trace and the server's absolute install paths (CWE-209). Independent of `NODE_ENV`.

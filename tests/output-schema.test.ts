@@ -264,3 +264,46 @@ describe('Tool outputSchema', () => {
     expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
   });
 });
+
+describe('Tool annotations', () => {
+  it('declares annotations for every advertised tool', () => {
+    const missing = CREEDSPACE_TOOLS.filter((t) => !t.annotations).map((t) => t.name);
+    expect(missing).toEqual([]);
+  });
+
+  it('gives every tool a title and explicit readOnly/openWorld hints', () => {
+    for (const tool of CREEDSPACE_TOOLS) {
+      expect(typeof tool.annotations!.title).toBe('string');
+      expect(typeof tool.annotations!.readOnlyHint).toBe('boolean');
+      expect(typeof tool.annotations!.openWorldHint).toBe('boolean');
+    }
+  });
+
+  it('omits destructive/idempotent hints on read-only tools and sets them otherwise', () => {
+    for (const tool of CREEDSPACE_TOOLS) {
+      const { readOnlyHint, destructiveHint, idempotentHint } = tool.annotations!;
+      if (readOnlyHint) {
+        // Both hints are defined only for tools that modify state.
+        expect(destructiveHint).toBeUndefined();
+        expect(idempotentHint).toBeUndefined();
+      } else {
+        expect(typeof destructiveHint).toBe('boolean');
+        expect(typeof idempotentHint).toBe('boolean');
+      }
+    }
+  });
+
+  it('marks no tool destructive - none of them delete user data', () => {
+    const destructive = CREEDSPACE_TOOLS.filter((t) => t.annotations!.destructiveHint).map(
+      (t) => t.name
+    );
+    expect(destructive).toEqual([]);
+  });
+
+  it('treats only the local cache tool as closed-world', () => {
+    const closedWorld = CREEDSPACE_TOOLS.filter((t) => !t.annotations!.openWorldHint).map(
+      (t) => t.name
+    );
+    expect(closedWorld).toEqual(['clear_cache']);
+  });
+});

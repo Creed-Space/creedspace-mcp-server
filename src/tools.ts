@@ -24,6 +24,11 @@ const UVC_QUALITIES_SCHEMA = {
 export const CREEDSPACE_TOOLS: Tool[] = [
   {
     name: 'get_constitution',
+    annotations: {
+      title: 'Get merged constitution',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description:
       'Get the merged constitution for a specific persona, including all active rules and UVC qualities',
     inputSchema: {
@@ -55,6 +60,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'list_personas',
+    annotations: {
+      title: 'List personas',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'List all available AI personas with their descriptions and current status',
     inputSchema: {
       type: 'object',
@@ -82,6 +92,13 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'set_persona',
+    annotations: {
+      title: 'Set active persona',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description: 'Switch to a different AI persona for the current session',
     inputSchema: {
       type: 'object',
@@ -105,6 +122,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'get_uvc_qualities',
+    annotations: {
+      title: 'Get UVC qualities',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Get the desired, disliked, and never qualities for a persona from the UVC system',
     inputSchema: {
       type: 'object',
@@ -132,6 +154,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'get_system_prompt',
+    annotations: {
+      title: 'Get system prompt',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description:
       'Get a complete system prompt for a persona including constitution and UVC qualities',
     inputSchema: {
@@ -160,6 +187,13 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'preview_export',
+    annotations: {
+      title: 'Preview export',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     description: 'Preview the export configuration for Claude Code or other AI tools',
     inputSchema: {
       type: 'object',
@@ -213,6 +247,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'get_constitution_by_id',
+    annotations: {
+      title: 'Get constitution by ID',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Get a specific constitution by its ID',
     inputSchema: {
       type: 'object',
@@ -242,6 +281,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'search_constitutions',
+    annotations: {
+      title: 'Search constitutions',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Search constitutions by keyword or persona',
     inputSchema: {
       type: 'object',
@@ -284,6 +328,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'get_active_persona',
+    annotations: {
+      title: 'Get active persona',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Get the currently active persona for this session',
     inputSchema: {
       type: 'object',
@@ -297,6 +346,13 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'clear_cache',
+    annotations: {
+      title: 'Clear local cache',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description: 'Clear the local cache to force fresh data from the API',
     inputSchema: {
       type: 'object',
@@ -313,6 +369,13 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'adjudicate',
+    annotations: {
+      title: 'Adjudicate a request',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     description: 'Get a policy decision kernel for a user request based on active constitutions and persona',
     inputSchema: {
       type: 'object',
@@ -407,6 +470,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'get_anchor',
+    annotations: {
+      title: 'Get creed anchor',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Get a compact anchor (1-2KB) with top 10 non-negotiable rules and creed hash for quick context reinforcement',
     inputSchema: {
       type: 'object',
@@ -444,6 +512,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'attest_response',
+    annotations: {
+      title: 'Attest a response',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Validate a response against the active creed to check for violations and ensure attestation',
     inputSchema: {
       type: 'object',
@@ -492,6 +565,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'heartbeat',
+    annotations: {
+      title: 'Heartbeat re-anchor',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Periodic re-anchoring to prevent context drift - returns mini-anchor every 10 messages',
     inputSchema: {
       type: 'object',
@@ -533,6 +611,13 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'perform_multi_scale_handshake',
+    annotations: {
+      title: 'Perform multi-scale handshake',
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
     description: 'Perform N-party value handshake across micro/meso/macro scales with anti-collusion and hierarchical budgets',
     inputSchema: {
       type: 'object',
@@ -618,6 +703,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
   },
   {
     name: 'get_scale_attestation',
+    annotations: {
+      title: 'Get scale attestation',
+      readOnlyHint: true,
+      openWorldHint: true,
+    },
     description: 'Get attestation record with hash chain for a specific scale and entity',
     inputSchema: {
       type: 'object',
