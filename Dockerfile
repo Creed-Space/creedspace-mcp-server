@@ -13,7 +13,7 @@
 FROM node:20-slim
 
 # Pin to the release matching this repo state. Bump alongside package.json version.
-RUN npm install -g "@creedspace/mcp-server@1.1.3"
+RUN npm install -g "@creedspace/mcp-server@1.1.4"
 
 # Default transport. The hosted HTTP deploy overrides this to "http" via env.
 ENV CREEDSPACE_TRANSPORT=stdio
