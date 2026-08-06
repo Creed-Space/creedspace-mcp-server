@@ -45,6 +45,28 @@ if [ "$MONO_VER" != "$NEWEST" ]; then
   [ "${SYNC_FORCE:-}" = "1" ] || exit 1
 fi
 
+# Second guard, added 2026-08-06 after finding the version check green while the
+# public repo was ~900 changed lines AHEAD. Work landed there by PR (the 1.1.4
+# outputSchema/annotations work, the Docker source-build fix, and the whole
+# mcp-registry-publish.yml workflow) without a version bump, so all three
+# versions read 1.1.4 and the check above waved the revert through. Versions do
+# not track content. Commits do: every sync this script makes is titled
+# "Sync from monorepo <sha>", so anything on top of the newest such commit is
+# work the public repo has and the monorepo may not.
+LAST_SYNC="$(git -C "$WORK" log -1 --format=%H --grep='^Sync from monorepo ' || true)"
+if [ -z "$LAST_SYNC" ]; then
+  echo "ABORT: no 'Sync from monorepo' commit in the public repo's history." >&2
+  echo "Cannot tell which public commits this script produced, so cannot tell what a" >&2
+  echo "destructive mirror would discard. Re-run with SYNC_FORCE=1 to override." >&2
+  [ "${SYNC_FORCE:-}" = "1" ] || exit 1
+elif [ "$(git -C "$WORK" rev-list --count "${LAST_SYNC}..HEAD")" -gt 0 ]; then
+  echo "ABORT: the public repo has advanced since the last sync ($(git -C "$WORK" log -1 --format=%s "$LAST_SYNC")):" >&2
+  git -C "$WORK" log --oneline "${LAST_SYNC}..HEAD" >&2
+  echo "Mirroring now would revert those commits. Port them into the monorepo first," >&2
+  echo "or re-run with SYNC_FORCE=1 if the monorepo is intentionally authoritative." >&2
+  [ "${SYNC_FORCE:-}" = "1" ] || exit 1
+fi
+
 echo "==> Refreshing tracked files from $SERVER_DIR"
 find "$WORK" -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
 rsync -a \

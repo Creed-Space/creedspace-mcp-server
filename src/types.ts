@@ -4,6 +4,12 @@ export interface Persona {
   icon: string;
   description: string;
   isActive: boolean;
+  uvc_token?: string;
+  suggested_qualities?: {
+    desired?: string[];
+    disliked?: string[];
+    never?: string[];
+  };
 }
 
 export interface Constitution {

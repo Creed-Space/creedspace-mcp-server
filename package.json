@@ -39,7 +39,7 @@
     "type": "git",
     "url": "git+https://github.com/Creed-Space/creedspace-mcp-server.git"
   },
-  "homepage": "https://www.creed.space",
+  "homepage": "https://creed.space",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "commander": "^12.1.0",
@@ -70,5 +70,9 @@
   "files": [
     "dist",
     "README.md"
-  ]
+  ],
+  "overrides": {
+    "brace-expansion": "^5.0.8",
+    "@hono/node-server": "^2.0.5"
+  }
 }

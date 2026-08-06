@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Security
+- Require a `cs_` API key before the CLI starts against the production Creed Space API.
+- Use only registered X-API-Key-compatible persona and constitution routes for identity and constitution tools.
+- Harden the HTTP transport (`src/transports/http.ts`).
+
+### Changed
+- Derive UVC identity and qualities from the registered persona payload instead of calling the nonexistent `/api/v1/uvc/{persona}` route.
+
+> These three landed in the monorepo copy and were dated `[1.1.4] - 2026-07-22`
+> there, but never reached npm: 1.1.4 was published from the public repo, which
+> did not have them. They are unreleased until the next version ships.
 
 ## [1.1.4] - 2026-07-23
 ### Added
