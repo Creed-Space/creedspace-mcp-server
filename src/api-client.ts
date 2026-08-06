@@ -16,6 +16,18 @@ function timeoutSignal(): AbortSignal {
   return AbortSignal.timeout(API_REQUEST_TIMEOUT_MS);
 }
 
+export function assertProductionApiAuthentication(config: Partial<CreedSpaceConfig>): void {
+  const apiUrl = config.apiUrl ?? process.env.CREEDSPACE_API_URL ?? 'https://api.creed.space';
+  const apiKey = config.apiKey ?? process.env.CREEDSPACE_API_KEY;
+  const isProductionApi = new URL(apiUrl).origin === 'https://api.creed.space';
+
+  if (isProductionApi && !config.offlineMode && (!apiKey || !apiKey.startsWith('cs_'))) {
+    throw new Error(
+      'CREEDSPACE_API_KEY is required for the production Creed Space API and must be a cs_ API key'
+    );
+  }
+}
+
 export class CreedSpaceClient {
   private config: CreedSpaceConfig;
   private cache: Map<string, CacheEntry> = new Map();
@@ -92,7 +104,11 @@ export class CreedSpaceClient {
         throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
 
-      const data = (await response.json()) as T;
+      const acceptsPlainText = Object.entries(headers).some(
+        ([name, value]) =>
+          name.toLowerCase() === 'accept' && value.toLowerCase().includes('text/plain')
+      );
+      const data = (acceptsPlainText ? await response.text() : await response.json()) as T;
 
       // Store ETag if present
       const newEtag = response.headers.get('ETag');
@@ -258,33 +274,9 @@ export class CreedSpaceClient {
   }
 
   async getMergedConstitution(personaId: string): Promise<MergedConstitution> {
-    try {
-      // Try to get merged constitution from the Live Config API
-      const liveConfig = await this.fetchWithCache<{
-        constitution?: { content?: string; rule_count?: number };
-        constitutions?: Constitution[];
-      }>(`/api/v1/mcp/constitution`, {
-        method: 'GET',
-        headers: {
-          'X-Persona-ID': personaId,
-        },
-      }).catch(() => null);
-
-      if (liveConfig?.constitution) {
-        const persona = await this.getPersona(personaId);
-        return {
-          persona,
-          constitutions: liveConfig.constitutions || [],
-          mergedContent: liveConfig.constitution.content || liveConfig.constitution,
-          totalRules: liveConfig.constitution.rule_count || 1,
-          creedHash: this.creedHash,
-        } as MergedConstitution;
-      }
-    } catch (error) {
-      console.warn('Live Config API not available, falling back to manual merge:', error);
-    }
-
-    // Fallback to manual merging
+    // Use the API-key-compatible persona and constitution routes. The Live Config
+    // route has a separate Bearer/DPoP contract and is not interchangeable with
+    // this package's X-API-Key authentication.
     const persona = await this.getPersona(personaId);
     const constitutions = await this.getConstitutions(personaId);
 
@@ -295,6 +287,7 @@ export class CreedSpaceClient {
       persona,
       constitutions,
       mergedContent,
+      uvcToken: persona.uvc_token,
       totalRules: constitutions.length,
       creedHash: this.creedHash,
     } as MergedConstitution;
@@ -303,36 +296,19 @@ export class CreedSpaceClient {
   async getUvcQualities(
     personaId: string
   ): Promise<{ qualities?: { desired?: string[]; disliked?: string[]; never?: string[] } } | null> {
-    try {
-      const data = await this.fetchWithCache<{
-        qualities?: { desired?: string[]; disliked?: string[]; never?: string[] };
-      }>(`/api/v1/uvc/${encodeURIComponent(personaId)}`);
-      return data;
-    } catch (error) {
-      // SECURITY: Log UVC fetch failures for monitoring
-      console.warn('[UVC_FETCH_ERROR]', {
-        personaId,
-        error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
-      });
+    const persona = await this.getPersona(personaId);
+    const qualities = persona.suggested_qualities;
+    if (!qualities) return null;
+    const stringValues = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-      // UVC might not be available for all personas - this is expected
-      // Re-throw critical errors but return null for 404/not found
-      if (error instanceof Error && error.message.includes('404')) {
-        return null; // Expected: UVC not configured for this persona
-      }
-
-      // For unexpected errors, preserve the error chain
-      if (error instanceof Error) {
-        const enhancedError = new Error(
-          `Failed to fetch UVC qualities for persona ${personaId}: ${error.message}`
-        );
-        enhancedError.cause = error;
-        throw enhancedError;
-      }
-
-      throw new Error(`Failed to fetch UVC qualities for persona ${personaId}: ${String(error)}`);
-    }
+    return {
+      qualities: {
+        desired: [...new Set(stringValues(qualities.desired))],
+        disliked: [...new Set(stringValues(qualities.disliked))],
+        never: [...new Set(stringValues(qualities.never))],
+      },
+    };
   }
 
   async getExportPreview(config: ExportConfig): Promise<string> {

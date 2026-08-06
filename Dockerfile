@@ -12,9 +12,11 @@
 # make that failure class impossible; npm remains the distribution channel for
 # end users, not for this image.
 #
-# NOTE: this Dockerfile lives in the public mirror. Sync any changes into the
-# monorepo's creedspace-mcp-server/Dockerfile or the next sync-to-public.sh run
-# will revert them. See _contprompts/creedspace_mcp_publishing.
+# NOTE: this file exists in both the monorepo and the public mirror. They were
+# reconciled 2026-08-06 and sync-to-public.sh now refuses to run when the public
+# repo has advanced past its last sync commit, so a one-sided edit is caught
+# rather than reverted -- but it is still two copies. Change both.
+# See _contprompts/creedspace_mcp_publishing.
 FROM node:20-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
