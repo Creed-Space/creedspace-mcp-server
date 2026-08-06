@@ -56,13 +56,48 @@ jobs:
         with:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
-      
+
+      # The v1.1.4 run on 2026-07-23 died here with `npm error code E404 ...
+      # PUT https://registry.npmjs.org/@creedspace%2fmcp-server - Not found`,
+      # which reads as "the package does not exist" but meant "nobody is logged
+      # in": the NPM_TOKEN secret did not exist until 2026-07-24, and npm
+      # answers an unauthenticated publish with 404 rather than 401. Prove the
+      # credential up front so a missing or revoked token says so.
+      - name: Verify npm credentials
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::NPM_TOKEN repository secret is unset or empty. Add a classic npm Automation token (Settings -> Secrets and variables -> Actions -> NPM_TOKEN), or switch this job to OIDC Trusted Publishing as described below."
+            exit 1
+          fi
+          if ! whoami_output=$(npm whoami 2>&1); then
+            echo "::error::NPM_TOKEN is set but npm rejected it -- the token is expired, revoked, or lacks publish rights on the @creedspace scope."
+            echo "${whoami_output}"
+            exit 1
+          fi
+          echo "Authenticated to npm as ${whoami_output}"
+
+      # A tag push publishes whatever package.json says, not whatever the tag
+      # says. Refuse the mismatch rather than shipping a surprise version.
+      - name: Check the tag matches package.json
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          package_version=$(node -p "require('./package.json').version")
+          if [ "${TAG#v}" != "${package_version}" ]; then
+            echo "::error::tag ${TAG} does not match package.json version ${package_version}"
+            exit 1
+          fi
+          echo "tag ${TAG} matches package.json version ${package_version}"
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build package
         run: npm run build
-      
+
       - name: Update version if manual trigger
         if: github.event_name == 'workflow_dispatch'
         env:
@@ -75,6 +110,22 @@ jobs:
           fi
           npm version "$INPUT_VERSION" --no-git-tag-version
       
+      # v1.1.4 reached npm by hand after this workflow failed, which left the
+      # tag un-republishable: a second attempt at an existing version is a hard
+      # error. Treat an already-present version as done so a re-run after a
+      # manual rescue is green, and so the release step below still runs.
+      - name: Check whether this version is already on npm
+        id: release_state
+        run: |
+          package_name=$(node -p "require('./package.json').name")
+          package_version=$(node -p "require('./package.json').version")
+          if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+            echo "::notice::${package_name}@${package_version} is already published; skipping the publish step."
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Auth = npm automation token. Add a repo secret NPM_TOKEN (a classic
       # Automation token — it bypasses 2FA, which granular/CI tokens do not).
       # setup-node's registry-url wired .npmrc to read NODE_AUTH_TOKEN; the
@@ -87,6 +138,7 @@ jobs:
       # (@creedspace/mcp-server -> Settings -> Trusted Publisher -> GitHub Actions:
       # org Creed-Space, repo creedspace-mcp-server, workflow publish.yml).
       - name: Publish to npm (with provenance)
+        if: steps.release_state.outputs.already_published == 'false'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -123,14 +175,16 @@ jobs:
     if: always()
     
     steps:
+      # `job.status` here is the notify job's own status, which is always
+      # success -- the 2026-07-23 failed publish still notified "success".
+      # Report what the publish job actually did.
       - name: Send notification
         uses: 8398a7/action-slack@v3
         if: env.SLACK_WEBHOOK_URL != ''
         with:
-          status: ${{ job.status }}
+          status: ${{ needs.publish.result == 'success' && 'success' || 'failure' }}
           text: |
-            NPM Package Published: creedspace-mcp-server
+            creedspace-mcp-server publish: ${{ needs.publish.result }}
             Version: ${{ github.ref_name }}
-            Status: ${{ job.status }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
