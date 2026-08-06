@@ -3,8 +3,19 @@ name: Publish to MCP Registry
 # Publishes server.json to the Official MCP Registry using GitHub Actions OIDC.
 # OIDC from this repo grants the io.github.Creed-Space/* namespace (the registry
 # grants the repository owner's namespace to Actions runs — no user token needed).
+#
+# The registry resolves and validates every package listed in server.json before
+# accepting the submission, so it can only publish AFTER the npm release is live.
+# The 2026-07-23 run failed exactly there — dispatched a minute after the v1.1.4
+# tag, while the npm publish was still failing on a missing token:
+#   "NPM package '@creedspace/mcp-server' exists, but version '1.1.4' was not
+#    found (status: 404)"
+# Hence the automatic chain off a successful npm publish, plus the wait below.
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Publish to NPM"]
+    types: [completed]
 
 permissions:
   id-token: write
@@ -13,8 +24,58 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # workflow_run fires on failure and cancellation too; only chase a green publish.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          # A workflow_run checkout defaults to the default branch, which is not
+          # necessarily the commit that was published; take the triggering one.
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.x'
+
+      # server.json carries the version twice and package.json a third time.
+      # Drift means registering a listing that points at the wrong tarball, and
+      # the registry cannot catch it — the stale version would resolve fine.
+      - name: Check server.json agrees with package.json
+        run: |
+          package_name=$(node -p "require('./package.json').name")
+          package_version=$(node -p "require('./package.json').version")
+          server_version=$(node -p "require('./server.json').version")
+          entry_name=$(node -p "require('./server.json').packages[0].identifier")
+          entry_version=$(node -p "require('./server.json').packages[0].version")
+          mismatch=0
+          if [ "${entry_name}" != "${package_name}" ]; then
+            echo "::error::server.json packages[0].identifier ${entry_name} != package.json name ${package_name}"
+            mismatch=1
+          fi
+          for candidate in "${server_version}" "${entry_version}"; do
+            if [ "${candidate}" != "${package_version}" ]; then
+              echo "::error::server.json version ${candidate} != package.json version ${package_version}"
+              mismatch=1
+            fi
+          done
+          [ "${mismatch}" -eq 0 ] || exit 1
+          echo "server.json and package.json agree on ${package_name}@${package_version}"
+
+      # npm's read replicas lag a publish by seconds to a couple of minutes.
+      - name: Wait for the npm release to be visible
+        run: |
+          package_name=$(node -p "require('./package.json').name")
+          package_version=$(node -p "require('./package.json').version")
+          for attempt in $(seq 1 20); do
+            if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+              echo "npm serves ${package_name}@${package_version} (attempt ${attempt})"
+              exit 0
+            fi
+            echo "attempt ${attempt}/20: ${package_name}@${package_version} is not on npm yet; waiting 15s"
+            sleep 15
+          done
+          echo "::error::${package_name}@${package_version} never appeared on npm after 5 minutes. Publish it first (the Publish to NPM workflow), then re-run this one."
+          exit 1
 
       - name: Install mcp-publisher
         run: |
