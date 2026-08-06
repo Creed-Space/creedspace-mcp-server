@@ -7,6 +7,7 @@ import { config as loadEnv } from 'dotenv';
 import * as fs from 'fs';
 import { MCP_SERVER_VERSION } from './version.js';
 import { sanitizeMcpServerConfigForLog } from './cli-logging.js';
+import { assertProductionApiAuthentication } from './api-client.js';
 
 // Load environment variables
 loadEnv();
@@ -186,6 +187,7 @@ program
     }
 
     try {
+      assertProductionApiAuthentication(config);
       const server = new CreedSpaceMCPServer(config);
       await server.start();
     } catch (error) {

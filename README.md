@@ -303,7 +303,7 @@ Full API documentation available at [https://api.creed.space/api-docs](https://a
 - 🌐 Website: [https://www.creed.space](https://www.creed.space)
 - 📧 Email: support@creed.space
 - 🐛 Issues: [GitHub Issues](https://github.com/Creed-Space/creedspace-mcp-server/issues)
-- 💬 Discord: [Join our community](https://discord.gg/creedspace)
+- 💬 Discord: [Join our community](https://creed.space/discord)
 
 ## License
 

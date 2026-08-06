@@ -32,5 +32,5 @@ Add to your claude_desktop_config.json:
   }
 }
 
-Learn more: https://www.creed.space
+Learn more: https://creed.space
 `);
