@@ -3,7 +3,7 @@
 Universal MCP server for Creed Space - AI safety guardrails in 10 seconds.
 
 [![npm version](https://img.shields.io/npm/v/@creedspace/mcp-server.svg)](https://www.npmjs.com/package/@creedspace/mcp-server)
-[![smithery badge](https://smithery.ai/badge/nell/creedspace)](https://smithery.ai/server/nell/creedspace)
+[![LightNow MCP capabilities](https://lightnow.ai/badge/io.github.Creed-Space/creedspace-mcp-server)](https://lightnow.ai/servers/io.github.Creed-Space/creedspace-mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Available in
@@ -13,7 +13,7 @@ The server is published to the canonical MCP catalogues, so registry-aware clien
 - **[npm](https://www.npmjs.com/package/@creedspace/mcp-server)** — `@creedspace/mcp-server`, the package every install path resolves to.
 - **[Official MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.Creed-Space/creedspace-mcp-server)** — `io.github.Creed-Space/creedspace-mcp-server`.
 - **[GitHub](https://github.com/Creed-Space/creedspace-mcp-server)** — source, issues, and the `server.json` manifest.
-- **[Smithery](https://smithery.ai/server/nell/creedspace)** — `nell/creedspace`, a gateway-fronted Streamable HTTP endpoint.
+- **[LightNow](https://lightnow.ai/servers/io.github.Creed-Space/creedspace-mcp-server)** — capability profile and version history.
 
 Also rolling out across the wider MCP ecosystem: [mcp.directory](https://mcp.directory), [mcpservers.org](https://mcpservers.org), [PulseMCP](https://www.pulsemcp.com) (via the registry ingest), and [mcp.so](https://mcp.so).
 
