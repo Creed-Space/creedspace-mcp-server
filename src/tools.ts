@@ -376,7 +376,8 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Get a policy decision kernel for a user request based on active constitutions and persona',
+    description:
+      'Get a policy decision kernel for a user request based on active constitutions and persona',
     inputSchema: {
       type: 'object',
       properties: {
@@ -452,7 +453,11 @@ export const CREEDSPACE_TOOLS: Tool[] = [
           items: { type: 'object' },
           description: 'Constitution sources cited by the decision',
         },
-        caveats: { type: 'array', items: { type: 'string' }, description: 'Caveats to the verdict' },
+        caveats: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Caveats to the verdict',
+        },
         nonce: {
           type: ['string', 'null'],
           description: 'Echo of the request nonce; null when none was supplied',
@@ -475,7 +480,8 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       readOnlyHint: true,
       openWorldHint: true,
     },
-    description: 'Get a compact anchor (1-2KB) with top 10 non-negotiable rules and creed hash for quick context reinforcement',
+    description:
+      'Get a compact anchor (1-2KB) with top 10 non-negotiable rules and creed hash for quick context reinforcement',
     inputSchema: {
       type: 'object',
       properties: {
@@ -517,7 +523,8 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       readOnlyHint: true,
       openWorldHint: true,
     },
-    description: 'Validate a response against the active creed to check for violations and ensure attestation',
+    description:
+      'Validate a response against the active creed to check for violations and ensure attestation',
     inputSchema: {
       type: 'object',
       properties: {
@@ -570,7 +577,8 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       readOnlyHint: true,
       openWorldHint: true,
     },
-    description: 'Periodic re-anchoring to reduce context drift - returns mini-anchor every 10 messages',
+    description:
+      'Periodic re-anchoring to reduce context drift - returns mini-anchor every 10 messages',
     inputSchema: {
       type: 'object',
       properties: {
@@ -618,7 +626,8 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       idempotentHint: false,
       openWorldHint: true,
     },
-    description: 'Perform N-party value handshake across micro/meso/macro scales with anti-collusion and hierarchical budgets',
+    description:
+      'Perform N-party value handshake across micro/meso/macro scales with anti-collusion and hierarchical budgets',
     inputSchema: {
       type: 'object',
       properties: {
@@ -675,7 +684,8 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       properties: {
         synthesized_constitution: {
           type: ['object', 'null'],
-          description: 'Merged UVC components agreed across parties; null when no synthesis was reached',
+          description:
+            'Merged UVC components agreed across parties; null when no synthesis was reached',
         },
         party_weights: {
           type: 'object',

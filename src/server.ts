@@ -301,7 +301,8 @@ export class CreedSpaceMCPServer {
 
           case 'clear_cache': {
             this.client.clearCache();
-            const message = 'Cache cleared successfully. Fresh data will be fetched on next request.';
+            const message =
+              'Cache cleared successfully. Fresh data will be fetched on next request.';
             return textResult(message, { cleared: true, message });
           }
 

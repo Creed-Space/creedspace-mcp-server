@@ -21,11 +21,14 @@ export async function startCreedSpaceServer(options?: {
   const { CreedSpaceMCPServer } = await import('./server.js');
   const server = new CreedSpaceMCPServer({
     ...options,
-    http: options?.transport === 'http' ? {
-      port: options.port ?? 3100,
-      host: options.host ?? 'localhost',
-      cors: false,
-    } : undefined,
+    http:
+      options?.transport === 'http'
+        ? {
+            port: options.port ?? 3100,
+            host: options.host ?? 'localhost',
+            cors: false,
+          }
+        : undefined,
   });
   await server.start();
 }

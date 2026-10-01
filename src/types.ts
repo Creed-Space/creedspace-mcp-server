@@ -71,12 +71,7 @@ export interface CreedSpaceConfig {
 // ---------------------------------------------------------------------------
 
 /** Binding verification level for a creed attestation. */
-export type CreedBindingLevel =
-  | 'self_declared'
-  | 'tested'
-  | 'verified'
-  | 'audited'
-  | 'certified';
+export type CreedBindingLevel = 'self_declared' | 'tested' | 'verified' | 'audited' | 'certified';
 
 /** Machine-verifiable proof that an agent operates under a specific creed. */
 export interface VCPCreedAttestation {

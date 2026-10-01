@@ -153,7 +153,9 @@ program
     if (process.env.CREEDSPACE_CORS_ORIGINS) {
       envConfig.http = {
         ...envConfig.http,
-        corsOrigins: process.env.CREEDSPACE_CORS_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean),
+        corsOrigins: process.env.CREEDSPACE_CORS_ORIGINS.split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean),
       };
     }
     config = {

@@ -61,7 +61,7 @@ export class Analytics {
         console.error('[ANALYTICS_ERROR] Failed to send metrics on exit', {
           error: error instanceof Error ? error.message : String(error),
           sessionId: this.sessionId,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         // Don't interrupt user flow, but ensure we log the failure
       });
@@ -133,9 +133,9 @@ export class Analytics {
         endpoint: this.analyticsEndpoint,
         sessionId: this.sessionId,
         eventCount: this.events.length,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-      
+
       // Analytics should never block user, but we need to know about failures
       // Re-throw critical errors that indicate security issues
       if (error instanceof Error && error.message.includes('ENOTFOUND')) {
@@ -154,7 +154,7 @@ export class Analytics {
       console.warn('[PACKAGE_VERSION_ERROR]', {
         error: error instanceof Error ? error.message : String(error),
         path: path.join(__dirname, '..', 'package.json'),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
       return 'unknown';
     }
