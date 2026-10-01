@@ -570,7 +570,7 @@ export const CREEDSPACE_TOOLS: Tool[] = [
       readOnlyHint: true,
       openWorldHint: true,
     },
-    description: 'Periodic re-anchoring to prevent context drift - returns mini-anchor every 10 messages',
+    description: 'Periodic re-anchoring to reduce context drift - returns mini-anchor every 10 messages',
     inputSchema: {
       type: 'object',
       properties: {

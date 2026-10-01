@@ -1,6 +1,6 @@
 # creedspace-mcp-server
 
-Universal MCP server for Creed Space - AI safety guardrails in 10 seconds.
+Constitution-based safety guardrails for any MCP client, installed with one npx command.
 
 [![npm version](https://img.shields.io/npm/v/@creedspace/mcp-server.svg)](https://www.npmjs.com/package/@creedspace/mcp-server)
 [![smithery badge](https://smithery.ai/badge/nell/creedspace)](https://smithery.ai/server/nell/creedspace)
@@ -32,11 +32,11 @@ npx @creedspace/mcp-server test
 
 ## What is Creed Space?
 
-Creed Space provides personalized AI safety guardrails through Constitutional AI personas. Each persona enforces specific values and behaviors, ensuring AI assistants operate within defined ethical boundaries.
+Creed Space provides AI safety guardrails as personas built from written constitutions. Each persona supplies rules an MCP-connected assistant can retrieve and check against, steering it toward defined ethical boundaries.
 
-- 🛡️ **Reduces harmful AI outputs** via constitutional evaluation of every response
-- 🎯 **Refuses dangerous prompts** according to the active persona's values
-- 🚀 **10-second setup** with any MCP-compatible AI
+- 🛡️ **Lets the assistant check a draft response** against the active persona's "never" list (`attest_response`, a keyword check) whenever it calls the tool
+- 🎯 **Supplies the active persona's rules** (constitution, anchor and a policy decision via `adjudicate`) for the assistant to apply
+- 🚀 **One-command install** (`npx`) with any MCP-compatible AI
 
 ## Available Personas
 
@@ -152,7 +152,7 @@ The server provides 16 tools to MCP clients:
 - `adjudicate` - Get a policy decision kernel for a request
 - `attest_response` - Validate a response against the active creed
 - `get_anchor` - Get a compact non-negotiable-rules anchor
-- `heartbeat` - Periodic re-anchoring to prevent context drift
+- `heartbeat` - Periodic re-anchoring to reduce context drift
 - `clear_cache` - Clear the local cache
 
 **Multi-scale value handshake**
@@ -220,10 +220,24 @@ args = ["@creedspace/mcp-server", "--persona", "ambassador"]
 CREEDSPACE_API_URL = "https://api.creed.space"
 ```
 
-### VS Code / Cursor
+### VS Code
+Add to `.mcp.json` at your workspace root:
 ```json
 {
-  "mcp.servers": {
+  "mcpServers": {
+    "creedspace": {
+      "command": "npx",
+      "args": ["@creedspace/mcp-server", "--persona", "ambassador"]
+    }
+  }
+}
+```
+
+### Cursor
+Add to `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json` for all projects:
+```json
+{
+  "mcpServers": {
     "creedspace": {
       "command": "npx",
       "args": ["@creedspace/mcp-server", "--persona", "ambassador"]
@@ -233,26 +247,16 @@ CREEDSPACE_API_URL = "https://api.creed.space"
 ```
 
 ### Continue.dev
-```json
-{
-  "models": [{
-    "provider": "openai",
-    "mcp_servers": [{
-      "command": "npx",
-      "args": ["@creedspace/mcp-server"]
-    }]
-  }]
-}
-```
-
-### LangChain
-```python
-from langchain.tools import MCPTool
-
-creedspace = MCPTool(
-    command="npx",
-    args=["@creedspace/mcp-server", "--persona", "ambassador"]
-)
+Add a file such as `.continue/mcpServers/creedspace.yaml` to your workspace (MCP tools run in Continue's agent mode):
+```yaml
+name: Creed Space
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: Creed Space
+    command: npx
+    args:
+      - "@creedspace/mcp-server"
 ```
 
 ## Testing
@@ -296,14 +300,14 @@ npm test
 
 ## API Documentation
 
-Full API documentation available at [https://api.creed.space/api-docs](https://api.creed.space/api-docs)
+The Creed Space API's OpenAPI specification is at [https://api.creed.space/openapi.json](https://api.creed.space/openapi.json)
 
 ## Support
 
 - 🌐 Website: [https://www.creed.space](https://www.creed.space)
 - 📧 Email: support@creed.space
 - 🐛 Issues: [GitHub Issues](https://github.com/Creed-Space/creedspace-mcp-server/issues)
-- 💬 Discord: [Join our community](https://discord.gg/creedspace)
+- 💬 Discord: [Join our community](https://www.creed.space/discord)
 
 ## License
 
@@ -311,4 +315,4 @@ MIT © [Nell Watson](https://github.com/nellwatson)
 
 ---
 
-*Building critical AI safety infrastructure that shapes autonomous AI-human value interaction.*
+*Built by [Creed Space](https://www.creed.space): practical infrastructure for AI safety and accountability.*

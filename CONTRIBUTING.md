@@ -3,7 +3,7 @@
 **This repository is a published mirror, not the source of truth.**
 
 `creedspace-mcp-server` is the public, installable home of the Creed Space MCP
-server — constitutional-AI safety guardrails for any LLM. Its contents are
+server — constitution-based safety guardrails for any MCP client. Its contents are
 **generated and mirrored** from a private monorepo. Anything you edit *here* will
 be **silently overwritten** the next time the maintainer runs the release sync
 (`scripts/sync-to-public.sh`).

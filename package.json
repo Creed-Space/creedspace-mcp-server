@@ -2,7 +2,7 @@
   "name": "@creedspace/mcp-server",
   "version": "1.1.4",
   "mcpName": "io.github.Creed-Space/creedspace-mcp-server",
-  "description": "Universal MCP server for Creed Space - AI safety guardrails in 10 seconds",
+  "description": "Constitution-based safety guardrails for any MCP client, installed with one npx command",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
