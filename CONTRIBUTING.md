@@ -1,28 +1,26 @@
-# Working in `creedspace-mcp-server` — read this first
+# Working in `creedspace-mcp-server`
 
-**This repository is a published mirror, not the source of truth.**
+The canonical source is the `creedspace-mcp-server/` directory in the private
+Creed Space monorepo.
 
-`creedspace-mcp-server` is the public, installable home of the Creed Space MCP
-server — constitution-based safety guardrails for any MCP client. Its contents are
-**generated and mirrored** from a private monorepo. Anything you edit *here* will
-be **silently overwritten** the next time the maintainer runs the release sync
-(`scripts/sync-to-public.sh`).
+The former local mirror script has been retired. It could overwrite public
+security fixes and push unreviewed working-tree state. npm publication now
+occurs only through the monorepo's protected, exact-tag
+`.github/workflows/mcp-server-release.yml` workflow.
 
 ## If you want to change something
 
 - **Bug reports & feature requests:** open a GitHub issue here — that's the right
   place and it's watched.
-- **Code / docs changes:** these are authored upstream in the private monorepo
-  and mirrored out. A pull request against this repo can't be merged in the
-  normal way (the sync would clobber it), but it is very welcome as a
-  **proposal** the maintainer can apply upstream — describe the intent clearly
-  and it will be carried across.
+- **Code and documentation changes:** propose them against the canonical
+  monorepo source. Changes to a separate public repository do not become release
+  inputs unless they are reviewed and incorporated upstream.
 
 ## Where it's published
 
-- **npm:** `@creedspace/mcp-server` — run with `npx @creedspace/mcp-server`.
+- **npm:** `@creedspace/mcp-server`. Install an exact version without lifecycle scripts with `npm install --global --ignore-scripts --save-exact @creedspace/mcp-server@<version>`, then run `creedspace-mcp`.
 - **Official MCP Registry:** `io.github.Creed-Space/creedspace-mcp-server` (see `server.json`).
-- Rolling out across mcp.directory, mcpservers.org, PulseMCP, mcp.so, Glama, and Smithery.
+- Registry availability is verified separately from repository source.
 
 The registry namespace is owner-based (`io.github.Creed-Space/…`), so it stays valid
 independent of this repo's name — the listing points at the npm package, not a
@@ -35,4 +33,4 @@ See [`README.md`](README.md) for install/config and the tool reference. More at
 
 ---
 
-*Maintainer: Nell Watson · Project: <https://www.creed.space>*
+_Maintainer: Nell Watson · Project: <https://www.creed.space>_

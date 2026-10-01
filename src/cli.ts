@@ -47,7 +47,7 @@ function mergeHttpConfig(
 
 program
   .name('creedspace-mcp')
-  .description('Constitution-based safety guardrails for any MCP client, installed with one npx command')
+  .description('Constitution-based safety guardrails for any MCP client')
   .version(MCP_SERVER_VERSION)
   .option('-p, --persona <id>', 'Set the active persona', 'ambassador')
   .option(

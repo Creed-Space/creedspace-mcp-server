@@ -1,6 +1,6 @@
 # creedspace-mcp-server
 
-Constitution-based safety guardrails for any MCP client, installed with one npx command.
+Constitution-based safety guardrails for any MCP client.
 
 [![npm version](https://img.shields.io/npm/v/@creedspace/mcp-server.svg)](https://www.npmjs.com/package/@creedspace/mcp-server)
 [![smithery badge](https://smithery.ai/badge/nell/creedspace)](https://smithery.ai/server/nell/creedspace)
@@ -32,11 +32,11 @@ npx @creedspace/mcp-server test
 
 ## What is Creed Space?
 
-Creed Space provides AI safety guardrails as personas built from written constitutions. Each persona supplies rules an MCP-connected assistant can retrieve and check against, steering it toward defined ethical boundaries.
+Creed Space provides AI safety guardrails as personas built from written constitutions. Each persona supplies rules an MCP-connected assistant can retrieve and check against, steering it toward defined ethical boundaries. Adherence depends on the client model and on whether your client acts on the decisions.
 
 - 🛡️ **Lets the assistant check a draft response** against the active persona's "never" list (`attest_response`, a keyword check) whenever it calls the tool
 - 🎯 **Supplies the active persona's rules** (constitution, anchor and a policy decision via `adjudicate`) for the assistant to apply
-- 🚀 **One-command install** (`npx`) with any MCP-compatible AI
+- 🚀 **Works with any MCP-compatible client** over stdio or HTTP
 
 ## Available Personas
 
