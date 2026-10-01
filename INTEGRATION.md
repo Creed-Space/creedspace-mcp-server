@@ -120,21 +120,10 @@ creedspace-mcp-server/
 - [x] Configuration generation works
 - [x] API client connects to local backend
 - [ ] Claude Desktop integration verified
-- [ ] Published to NPM registry
-
-## 🐛 Known Issues
-
-1. **API Endpoints**: Some constitution endpoints don't exist yet in backend
-   - Workaround: Using mock data for now
-2. **Domain**: `api.creed.space` doesn't resolve yet
-   - Workaround: Defaults to `localhost:8000` for testing
+- [x] Published to NPM registry
 
 ## 📚 Resources
 
 - [MCP Protocol Docs](https://modelcontextprotocol.io/docs)
-- [Creed Space API](http://localhost:8000/api-docs)
-- [NPM Package](https://www.npmjs.com/package/@creedspace/mcp-server) (after publishing)
-
----
-
-*This NPM package replaces the broken agent-hub-mcp integration and provides universal MCP support for Creed Space with zero friction.*
+- [Creed Space API](https://api.creed.space/docs)
+- [NPM Package](https://www.npmjs.com/package/@creedspace/mcp-server)
